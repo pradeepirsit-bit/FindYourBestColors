@@ -69,10 +69,10 @@
             gap: 8px;
         }
         /* VIBGYOR slider */
-        .vibgyor-slider-area {
+        .vibgyor-slider-area, .manual-skin-area {
             margin: 16px 0 8px;
         }
-        .vibgyor-label {
+        .vibgyor-label, .manual-skin-label {
             display: flex;
             justify-content: space-between;
             font-size: 0.75rem;
@@ -87,7 +87,7 @@
             background: linear-gradient(90deg, #8B00FF, #4B0082, #0000FF, #00FF00, #FFFF00, #FF7F00, #FF0000);
             outline: none;
         }
-        .vibgyor-slider::-webkit-slider-thumb {
+        .vibgyor-slider::-webkit-slider-thumb, .skin-slider::-webkit-slider-thumb {
             -webkit-appearance: none;
             width: 24px;
             height: 24px;
@@ -96,6 +96,14 @@
             border: 2px solid #2c2b28;
             cursor: pointer;
             box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+        .skin-slider {
+            width: 100%;
+            -webkit-appearance: none;
+            height: 12px;
+            border-radius: 12px;
+            background: linear-gradient(90deg, #f7e5cf, #e0ac7a, #c17a4a, #8b4a2a, #4a2512);
+            outline: none;
         }
         .photo-controls {
             display: flex;
@@ -259,6 +267,11 @@
             border-radius: 20px;
             transition: filter 0.05s linear;
         }
+        .error-msg {
+            color: #b13e3e;
+            font-size: 0.7rem;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -293,7 +306,15 @@
                         <span>Violet</span> <span>Indigo</span> <span>Blue</span> <span>Green</span> <span>Yellow</span> <span>Orange</span> <span>Red</span>
                     </div>
                     <input type="range" id="vibgyorSlider" class="vibgyor-slider" min="0" max="360" step="1" value="0">
-                    <div style="font-size:0.7rem; margin-top:6px;">Slide to apply a rainbow color cast to your face photo (does not affect color analysis).</div>
+                    <div style="font-size:0.7rem; margin-top:6px;">Slide to apply a rainbow color cast to your face photo (does not affect analysis).</div>
+                </div>
+                <div class="manual-skin-area">
+                    <div class="manual-skin-label">
+                        <span>☀️ Manual skin lightness (fallback)</span>
+                        <span id="skinLightnessValue">52</span>
+                    </div>
+                    <input type="range" id="manualSkinSlider" class="skin-slider" min="0" max="100" step="1" value="52">
+                    <div style="font-size:0.7rem;">If face detection fails, drag this to manually adjust your skin tone → updates all scores.</div>
                 </div>
                 <div class="color-wheel-container">
                     <canvas id="colorWheelCanvas" width="280" height="280" style="width:280px; height:280px"></canvas>
@@ -336,23 +357,23 @@
                         </div>
                     </div>
                 </div>
-                <p style="margin-top:12px; font-size:0.75rem;">Slide to change shirt color → score based on your detected skin tone.</p>
+                <p style="margin-top:12px; font-size:0.75rem;">Slide to change shirt color → score based on your detected or manually selected skin tone.</p>
             </div>
         </div>
     </div>
     <div class="note">
-        🔬 Real skin extraction via Face‑API.js. The VIBGYOR slider adds a playful hue-rotate to your face photo – the wheel center shows your original face.
+        🔬 Face detection uses corrected model URLs. If detection fails, use the manual skin lightness slider.<br>
+        🌈 VIBGYOR slider only affects the preview image – the wheel centre shows your original face.
     </div>
 </div>
 
 <script>
     // --------------------------------------------------------------
-    // SCIENTIFIC COLOR SCORING ENGINE (based on detected skin tone)
+    // SCIENTIFIC COLOR SCORING ENGINE (based on skin lightness)
     // --------------------------------------------------------------
-    let currentSkinLightness = 52;      // will be updated from face detection
-    let currentSkinHue = 35;            // warm undertone default
-    let isAutoDetected = false;
-    let currentFaceImage = null;         // store the HTMLImageElement for the wheel center
+    let currentSkinLightness = 52;      // 0-100
+    let currentSkinHue = 35;            // warm undertone (fixed for simplicity)
+    let currentFaceImage = null;         // for wheel center
 
     function getDynamicSkinProfile(lightness, hue = 35) {
         let idealHueCenter, hueWidth, idealContrast;
@@ -401,8 +422,8 @@
         { name: "Lavender", hex: "#E6E6FA", hsl: { h: 240, s: 67, l: 94 } }
     ];
 
-    function computeAllScoresDynamic(lightness, hueUndertone = 35) {
-        const profile = getDynamicSkinProfile(lightness, hueUndertone);
+    function computeAllScoresDynamic(lightness) {
+        const profile = getDynamicSkinProfile(lightness, currentSkinHue);
         return colorLibrary.map(color => {
             let score = scoreColorForSkinDynamic(color.hsl.h, color.hsl.s, color.hsl.l, lightness, profile);
             return { ...color, score };
@@ -442,7 +463,7 @@
             ctx.strokeStyle = "#f2efe8";
             ctx.lineWidth = 1.5;
             ctx.stroke();
-            // draw small labels (first 3 letters) around the wheel
+            // short labels
             ctx.save();
             ctx.translate(centerX + Math.cos(start+angleStep/2) * (radius*0.75), centerY + Math.sin(start+angleStep/2) * (radius*0.75));
             ctx.fillStyle = "#1e1b18";
@@ -451,7 +472,7 @@
             ctx.restore();
         }
 
-        // ----- Draw center image (circular) -----
+        // ---- draw center image (circular) ----
         const centerRadius = 38;
         ctx.save();
         ctx.beginPath();
@@ -459,8 +480,6 @@
         ctx.closePath();
         ctx.clip();
         if (currentFaceImage && currentFaceImage.complete && currentFaceImage.naturalWidth > 0) {
-            // Draw the original face image (without any VIBGYOR filter) in the center
-            // Scale to fill the circle
             const imgW = currentFaceImage.naturalWidth;
             const imgH = currentFaceImage.naturalHeight;
             const scale = Math.max(centerRadius * 2 / imgW, centerRadius * 2 / imgH);
@@ -479,8 +498,6 @@
             ctx.fillText("you", centerX, centerY);
         }
         ctx.restore();
-
-        // Draw a thin white border around the center circle
         ctx.beginPath();
         ctx.arc(centerX, centerY, centerRadius, 0, 2 * Math.PI);
         ctx.strokeStyle = "white";
@@ -489,7 +506,7 @@
     }
 
     function refreshUI() {
-        const scored = computeAllScoresDynamic(currentSkinLightness, currentSkinHue);
+        const scored = computeAllScoresDynamic(currentSkinLightness);
         const cats = categorizeColors(scored);
         document.getElementById("colorCategories").innerHTML = `
             <div class="cat"><span class="cat-badge">🟢 Best Colors for You ✅</span><div class="color-swatch-list">${renderSwatchList(cats.best)}</div></div>
@@ -500,7 +517,7 @@
         const tbody = document.getElementById("scoreTableBody");
         tbody.innerHTML = scored.slice(0,12).map(c => `
             <tr><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:20px;height:20px;background:${c.hex};border-radius:6px;"></div> ${c.name}</div></td>
-            <td>${c.score}/100 <div class="score-bar"><div class="score-fill" style="width:${c.score}%; background:${c.score>=80?'#2e7d64':c.score>=65?'#e6b422':'#b13e3e'}"></div></div></td>
+            <td>${c.score}/100 <div class="score-bar"><div class="score-fill" style="width:${c.score}%; background:${c.score>=80?'#2e7d64':c.score>=65?'#e6b422':'#b13e3e'}"></div></div></td></tr>
         `).join('');
         drawColorWheel(scored);
         updateOutfitScoreAndAvatar();
@@ -540,18 +557,27 @@
         ctx.fillRect(w/2-48, 68, 96, 12);
     }
 
-    // ------------------- Face detection & skin extraction -------------------
+    // ------------------- Face detection & skin extraction (fixed URLs) -------------------
     let modelsLoaded = false;
     let currentStream = null;
-    let currentPreviewImage = null;   // store img element for VIBGYOR filter
+    let currentPreviewImage = null;
 
     async function loadFaceApiModels() {
         const statusDiv = document.getElementById("analysisStatus");
         statusDiv.innerText = "Loading AI models...";
-        await faceapi.nets.tinyFaceDetector.loadFromUri("https://raw.githubusercontent.com/justadudewhohas/face-api/master/weights");
-        await faceapi.nets.faceLandmark68Net.loadFromUri("https://raw.githubusercontent.com/justadudewhohas/face-api/master/weights");
-        modelsLoaded = true;
-        statusDiv.innerText = "Ready ✅";
+        try {
+            // CORRECTED URL: official face-api.js repo weights
+            const modelUrl = 'https://raw.githubusercontent.com/justadudewhohas/face-api.js/master/weights';
+            await faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl);
+            await faceapi.nets.faceLandmark68Net.loadFromUri(modelUrl);
+            modelsLoaded = true;
+            statusDiv.innerText = "Ready ✅";
+        } catch (err) {
+            console.error("Model load error", err);
+            statusDiv.innerText = "⚠️ Model load failed – using manual skin slider";
+            document.getElementById("analysisStatus").style.background = "#f8d7da";
+            modelsLoaded = false;
+        }
     }
 
     function rgbToHsl(r, g, b) {
@@ -573,7 +599,7 @@
     }
 
     async function extractSkinFromImage(imageElement) {
-        if (!modelsLoaded) await loadFaceApiModels();
+        if (!modelsLoaded) throw new Error("Face detection models not loaded");
         const detections = await faceapi.detectAllFaces(imageElement, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
         if (!detections.length) throw new Error("No face detected");
         const detection = detections[0];
@@ -610,19 +636,35 @@
             const { lightness, hue } = await extractSkinFromImage(imageElement);
             currentSkinLightness = lightness;
             currentSkinHue = hue;
-            isAutoDetected = true;
+            // sync manual slider
+            document.getElementById("manualSkinSlider").value = lightness;
+            document.getElementById("skinLightnessValue").innerText = Math.round(lightness);
             refreshUI();
             document.getElementById("analysisStatus").innerText = `Detected: L=${Math.round(lightness)} (auto)`;
+            document.getElementById("analysisStatus").style.background = "#eae3d8";
         } catch(err) {
-            alert("Face detection failed: " + err.message);
-            document.getElementById("analysisStatus").innerText = "Detection failed, using default skin";
-            currentSkinLightness = 52;
-            currentSkinHue = 35;
-            refreshUI();
+            console.warn(err);
+            document.getElementById("analysisStatus").innerText = `Detection failed: ${err.message} – using manual slider`;
+            document.getElementById("analysisStatus").style.background = "#f8d7da";
+            // keep currentSkinLightness unchanged (manual slider will adjust)
         }
     }
 
-    // VIBGYOR slider: apply hue-rotate to preview image
+    // Manual skin slider
+    function initManualSkinSlider() {
+        const slider = document.getElementById("manualSkinSlider");
+        const valueSpan = document.getElementById("skinLightnessValue");
+        slider.addEventListener("input", (e) => {
+            const val = parseInt(e.target.value);
+            currentSkinLightness = val;
+            valueSpan.innerText = val;
+            refreshUI();
+            document.getElementById("analysisStatus").innerText = `Manual skin: L=${val}`;
+            document.getElementById("analysisStatus").style.background = "#eae3d8";
+        });
+    }
+
+    // VIBGYOR slider
     function initVibgyorSlider() {
         const slider = document.getElementById("vibgyorSlider");
         slider.addEventListener("input", (e) => {
@@ -650,7 +692,6 @@
         const img = new Image();
         img.onload = async () => {
             URL.revokeObjectURL(imgUrl);
-            // Store the original image for wheel center
             currentFaceImage = img;
             await applySkinFromImage(img, imgUrl);
             const previewDiv = document.getElementById("previewArea");
@@ -708,9 +749,10 @@
 
     // Initialize
     loadFaceApiModels().then(() => {
+        initManualSkinSlider();
         initVibgyorSlider();
         refreshUI();
-    }).catch(err => console.warn("Model load error", err));
+    }).catch(err => console.warn("Initialization error", err));
 </script>
 </body>
 </html>
