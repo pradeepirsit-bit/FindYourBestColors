@@ -2,362 +2,715 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bike Roar Rater - TFJS On-Device</title>
-    
-    <!-- Load TensorFlow.js -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@1.3.1/dist/tf.min.js"></script>
-    <!-- Load Teachable Machine Audio Extension (Handles complex FFT/Spectrogram math automatically) -->
-    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/speech-commands@0.4.0/dist/speech-commands.min.js"></script>
-
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Your Best Colors – Face in Colour Wheel + VIBGYOR</title>
+    <!-- Face API JS -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <style>
-        :root {
-            --primary: #ff4500;
-            --secondary: #222;
-            --bg: #0a0a0a;
-            --text: #ffffff;
-            --accent: #00ff7f;
+        * {
+            box-sizing: border-box;
+            font-family: system-ui, 'Segoe UI', 'Inter', -apple-system, sans-serif;
         }
-
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: var(--bg);
-            color: var(--text);
+            background: #f7f5f0;
+            margin: 0;
+            padding: 20px;
+            color: #2c2b28;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            margin: 0 0 0.25rem 0;
+            letter-spacing: -0.3px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .subhead {
+            color: #5b5b56;
+            border-left: 3px solid #c9a87b;
+            padding-left: 16px;
+            margin: 12px 0 24px 0;
+            font-weight: 400;
+        }
+        .two-columns {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 30px;
+        }
+        .left-panel {
+            flex: 1.2;
+            min-width: 300px;
+        }
+        .right-panel {
+            flex: 2;
+            min-width: 340px;
+        }
+        .card {
+            background: white;
+            border-radius: 32px;
+            padding: 20px 24px;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.03), 0 2px 6px rgba(0,0,0,0.05);
+            margin-bottom: 24px;
+            border: 1px solid #eee6dc;
+        }
+        .card-title {
+            font-weight: 600;
+            font-size: 1.2rem;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        /* VIBGYOR slider */
+        .vibgyor-slider-area {
+            margin: 16px 0 8px;
+        }
+        .vibgyor-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: #5b5b56;
+            margin-bottom: 8px;
+        }
+        .vibgyor-slider {
+            width: 100%;
+            -webkit-appearance: none;
+            height: 12px;
+            border-radius: 12px;
+            background: linear-gradient(90deg, #8B00FF, #4B0082, #0000FF, #00FF00, #FFFF00, #FF7F00, #FF0000);
+            outline: none;
+        }
+        .vibgyor-slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid #2c2b28;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+        }
+        .photo-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 16px 0 12px;
+            align-items: center;
+        }
+        button {
+            background: #e6dfd5;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 40px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.1s;
+        }
+        button.primary {
+            background: #2c6e4f;
+            color: white;
+        }
+        .webcam-container {
+            margin-top: 12px;
             display: flex;
             flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            margin: 0;
-            text-align: center;
+            gap: 12px;
         }
-
-        .container {
-            background-color: var(--secondary);
-            padding: 2.5rem;
+        video, #uploadedImagePreview, #capturedCanvas {
+            width: 100%;
+            max-width: 240px;
             border-radius: 20px;
-            box-shadow: 0 15px 40px rgba(255, 69, 0, 0.15);
-            width: 90%;
-            max-width: 450px;
+            border: 1px solid #ddd;
+            background: #e9e2d6;
+        }
+        .color-wheel-container {
+            text-align: center;
+            margin: 10px 0;
             position: relative;
-            overflow: hidden;
         }
-
-        /* Top highlight bar */
-        .container::before {
-            content: '';
-            position: absolute;
-            top: 0; left: 0; right: 0;
-            height: 5px;
-            background: linear-gradient(90deg, var(--primary), var(--accent));
-        }
-
-        h1 { margin-top: 0; color: var(--primary); text-transform: uppercase; letter-spacing: 2px; }
-        p { color: #aaaaaa; font-size: 0.95rem; margin-bottom: 25px; }
-
-        #record-btn {
-            background: linear-gradient(145deg, #ff5722, #e63e00);
-            color: white;
-            border: none;
+        canvas {
+            max-width: 100%;
+            height: auto;
+            background: #f2efe8;
             border-radius: 50%;
-            width: 90px; height: 90px;
-            font-size: 32px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 8px 20px rgba(255, 69, 0, 0.4);
-            margin: 10px auto 25px auto;
-            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 8px 18px rgba(0,0,0,0.1);
         }
-
-        #record-btn:active { transform: scale(0.9); }
-        
-        #record-btn.recording {
-            background: #dc143c;
-            animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        .legend {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 16px;
+            font-size: 0.75rem;
         }
-
-        @keyframes pulse-ring {
-            0% { box-shadow: 0 0 0 0 rgba(220, 20, 60, 0.7); }
-            70% { box-shadow: 0 0 0 25px rgba(220, 20, 60, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(220, 20, 60, 0); }
+        .legend span {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            border-radius: 14px;
+            margin-right: 5px;
         }
-
-        /* Progress Bar for the 5s capture */
-        .progress-container { width: 100%; height: 6px; background: #333; border-radius: 3px; margin-bottom: 15px; display: none; overflow: hidden; }
-        .progress-bar { height: 100%; width: 0%; background: var(--primary); transition: width 0.1s linear; }
-
-        .results { display: none; animation: slideUp 0.5s ease-out forwards; border-top: 1px solid #333; padding-top: 20px; }
-        
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+        .color-categories {
+            margin-top: 20px;
         }
-
-        .score-box { background: rgba(0,0,0,0.4); padding: 15px; border-radius: 12px; margin-bottom: 15px; }
-        .score-display { font-size: 4rem; font-weight: 900; color: var(--accent); margin: 0; line-height: 1; text-shadow: 0 0 15px rgba(0,255,127,0.3); }
-        .bonus-text { font-size: 0.8rem; color: #ffeb3b; margin-top: 5px; }
-
-        .bike-badge {
-            display: inline-block; padding: 6px 12px; border-radius: 6px;
-            background: #333; font-weight: bold; font-size: 1.1rem; margin: 10px 0;
-            border-left: 4px solid var(--primary);
+        .cat {
+            margin-bottom: 18px;
         }
-
-        .trash-talk {
-            font-size: 1.1rem; font-style: italic; background: rgba(255,255,255,0.05);
-            padding: 15px; border-radius: 8px; margin-top: 10px; border: 1px solid #444;
+        .cat-badge {
+            font-weight: 600;
+            margin-right: 12px;
+            display: inline-block;
+            width: 200px;
         }
-
-        #status { color: #888; font-size: 0.9rem; font-weight: 500; height: 20px; }
+        .color-swatch-list {
+            display: inline-flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .swatch {
+            display: inline-flex;
+            align-items: center;
+            background: #f3f0ea;
+            border-radius: 40px;
+            padding: 4px 12px 4px 8px;
+            font-size: 0.8rem;
+            gap: 8px;
+        }
+        .swatch-color {
+            width: 22px;
+            height: 22px;
+            border-radius: 22px;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+        .score-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.85rem;
+        }
+        .score-table td, .score-table th {
+            padding: 10px 6px;
+            border-bottom: 1px solid #e9e2d8;
+        }
+        .score-bar {
+            display: inline-block;
+            height: 8px;
+            width: 60px;
+            background: #e0d8ce;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-left: 8px;
+            vertical-align: middle;
+        }
+        .score-fill {
+            height: 100%;
+            border-radius: 8px;
+        }
+        .avatar-area {
+            background: #ece6dd;
+            border-radius: 28px;
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 24px;
+            margin-top: 16px;
+        }
+        .avatar-canvas {
+            background: #dbd2c4;
+            border-radius: 32px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .slider-control {
+            flex: 1;
+            min-width: 180px;
+        }
+        input[type="range"] {
+            width: 100%;
+            margin: 12px 0;
+        }
+        .outfit-score {
+            font-size: 2rem;
+            font-weight: 700;
+            margin: 10px 0;
+        }
+        .note {
+            font-size: 0.75rem;
+            color: #7f6e5c;
+            margin-top: 24px;
+            text-align: center;
+            border-top: 1px solid #e2d9cf;
+            padding-top: 20px;
+        }
+        .status-badge {
+            background: #eae3d8;
+            border-radius: 30px;
+            padding: 4px 12px;
+            font-size: 0.7rem;
+            display: inline-block;
+        }
+        .preview-img {
+            max-width: 200px;
+            border-radius: 20px;
+            transition: filter 0.05s linear;
+        }
     </style>
 </head>
 <body>
+<div class="container">
+    <h1>🎨 Find Your Best Colors <span class="status-badge" id="analysisStatus">Ready</span></h1>
+    <div class="subhead">Upload a selfie or use webcam – AI extracts your skin tone, then shows your best colors. No judgement.</div>
 
-    <div class="container">
-        <h1>Roar Rater</h1>
-        <p>100% On-Device AI Architecture</p>
-        
-        <button id="record-btn">🎤</button>
-        
-        <div class="progress-container" id="progress-container">
-            <div class="progress-bar" id="progress-bar"></div>
-        </div>
-        
-        <div id="status">Tap mic to load AI and record</div>
-
-        <div class="results" id="results-card">
-            <div class="score-box">
-                <div style="font-size: 0.9rem; color:#aaa; text-transform:uppercase; letter-spacing:1px;">Final Roar Score</div>
-                <div class="score-display" id="roar-score">0</div>
-                <div class="bonus-text" id="bonus-text">+0 Character Bonus</div>
+    <div class="two-columns">
+        <!-- LEFT: face input + VIBGYOR slider + wheel -->
+        <div class="left-panel">
+            <div class="card">
+                <div class="card-title">📸 1. Provide your face</div>
+                <div class="photo-controls">
+                    <input type="file" id="uploadPhoto" accept="image/jpeg,image/png" style="display:none">
+                    <button id="uploadBtn" class="primary">📁 Upload Photo</button>
+                    <button id="webcamBtn">🎥 Use Webcam</button>
+                    <button id="resetFilterBtn" style="background:#dbcebc;">✨ Reset filter</button>
+                </div>
+                <div id="webcamPanel" style="display:none;" class="webcam-container">
+                    <video id="video" width="240" height="180" autoplay muted></video>
+                    <button id="captureBtn">📸 Capture & Analyze</button>
+                    <button id="stopWebcamBtn">⏹️ Stop Webcam</button>
+                </div>
+                <div id="previewArea"></div>
+                <div style="font-size:0.75rem; margin-top:8px;">✅ After upload/capture, face is detected → skin tone extracted → color recommendations update.</div>
             </div>
-            
-            <div><span class="bike-badge" id="bike-class">Analyzing...</span></div>
-            <div class="trash-talk" id="trash-talk-text"></div>
+
+            <div class="card">
+                <div class="card-title">🌈 2. VIBGYOR color filter (fun effect)</div>
+                <div class="vibgyor-slider-area">
+                    <div class="vibgyor-label">
+                        <span>Violet</span> <span>Indigo</span> <span>Blue</span> <span>Green</span> <span>Yellow</span> <span>Orange</span> <span>Red</span>
+                    </div>
+                    <input type="range" id="vibgyorSlider" class="vibgyor-slider" min="0" max="360" step="1" value="0">
+                    <div style="font-size:0.7rem; margin-top:6px;">Slide to apply a rainbow color cast to your face photo (does not affect color analysis).</div>
+                </div>
+                <div class="color-wheel-container">
+                    <canvas id="colorWheelCanvas" width="280" height="280" style="width:280px; height:280px"></canvas>
+                    <div class="legend">
+                        <span style="background:#2e7d64;"></span> Best&nbsp;&nbsp;
+                        <span style="background:#e6b422;"></span> Good&nbsp;&nbsp;
+                        <span style="background:#cb7b4a;"></span> Neutral&nbsp;&nbsp;
+                        <span style="background:#b13e3e;"></span> Wash out
+                    </div>
+                </div>
+            </div>
+
+            <div class="card" id="categoriesCard">
+                <div class="card-title">🏆 Color recommendations</div>
+                <div class="color-categories" id="colorCategories"></div>
+            </div>
+        </div>
+
+        <!-- RIGHT: score table + viral slider -->
+        <div class="right-panel">
+            <div class="card">
+                <div class="card-title">📊 Color score (0–100)</div>
+                <table class="score-table" id="scoreTable">
+                    <thead><tr><th>Color</th><th>Score</th></tr></thead>
+                    <tbody id="scoreTableBody"></tbody>
+                </table>
+            </div>
+
+            <div class="card">
+                <div class="card-title">✨ VIRAL FEATURE ✨</div>
+                <div style="font-weight:500;">"How attractive does this outfit color look on me?"</div>
+                <div class="avatar-area">
+                    <canvas id="avatarCanvas" width="140" height="140" style="width:140px; height:140px; border-radius: 24px;"></canvas>
+                    <div class="slider-control">
+                        <label style="font-weight:500;">Pick outfit color</label>
+                        <input type="range" id="outfitColorSlider" min="0" max="360" step="1" value="210">
+                        <div style="display:flex; gap:12px; flex-wrap:wrap; margin:10px 0;">
+                            <div style="background:#2c6e9e; width:40px; height:40px; border-radius:12px;" id="liveColorPreview"></div>
+                            <div class="outfit-score" id="outfitScoreDisplay">--</div>
+                        </div>
+                    </div>
+                </div>
+                <p style="margin-top:12px; font-size:0.75rem;">Slide to change shirt color → score based on your detected skin tone.</p>
+            </div>
         </div>
     </div>
+    <div class="note">
+        🔬 Real skin extraction via Face‑API.js. The VIBGYOR slider adds a playful hue-rotate to your face photo – the wheel center shows your original face.
+    </div>
+</div>
 
-    <script>
-        // --- 1. CONFIGURATION ---
-        // REPLACE this URL with your own Teachable Machine Audio model link once you train it!
-        // Example: "https://teachablemachine.withgoogle.com/models/YOUR_MODEL_ID/"
-        const URL = "https://teachablemachine.withgoogle.com/models/placeholder/"; 
-        
-        const RECORD_DURATION_MS = 5000; // 5 seconds
-        
-        // Trash Talk Engine (Tamil-English)
-        const trashTalkTemplates = {
-            low: [
-                "Enna ba, mixer grinder sound kekuthu! 😂",
-                "TVS 50 ah idhu? Needs more throat! 🛵",
-                "Sathame illa... Cycle otlama ba? 🚲"
-            ],
-            medium: [
-                "Not bad, aana innum konjam raw power thevai! 🏍️",
-                "Decent ah irukku, but where is the bass man? 🤔",
-                "KTM Duke vibes, pulling out okay! 🔥"
-            ],
-            high: [
-                "Verithanam! Pure muscle! 💥",
-                "Therikkavidalama! That's a beast roaring! 🦁",
-                "Kaantha kural! Royal Enfield thozha! 👑"
-            ]
-        };
+<script>
+    // --------------------------------------------------------------
+    // SCIENTIFIC COLOR SCORING ENGINE (based on detected skin tone)
+    // --------------------------------------------------------------
+    let currentSkinLightness = 52;      // will be updated from face detection
+    let currentSkinHue = 35;            // warm undertone default
+    let isAutoDetected = false;
+    let currentFaceImage = null;         // store the HTMLImageElement for the wheel center
 
-        // UI Elements
-        const recordBtn = document.getElementById('record-btn');
-        const statusText = document.getElementById('status');
-        const resultsCard = document.getElementById('results-card');
-        const roarScoreEl = document.getElementById('roar-score');
-        const bikeClassEl = document.getElementById('bike-class');
-        const trashTalkEl = document.getElementById('trash-talk-text');
-        const bonusTextEl = document.getElementById('bonus-text');
-        const progressContainer = document.getElementById('progress-container');
-        const progressBar = document.getElementById('progress-bar');
+    function getDynamicSkinProfile(lightness, hue = 35) {
+        let idealHueCenter, hueWidth, idealContrast;
+        if (lightness > 68) {
+            idealHueCenter = (hue > 20) ? 55 : 340;
+            hueWidth = 70;
+            idealContrast = 38;
+        } else if (lightness > 48) {
+            idealHueCenter = (hue > 25) ? 30 : 200;
+            hueWidth = 85;
+            idealContrast = 32;
+        } else {
+            idealHueCenter = (hue > 30) ? 25 : 280;
+            hueWidth = 80;
+            idealContrast = 45;
+        }
+        return { skinLightness: lightness, idealHueCenter, hueWidth, idealContrast };
+    }
 
-        // State Variables
-        let isRecording = false;
-        let recognizer;
-        let audioContext;
-        let analyser;
-        let microphone;
-        let maxVolume = 0;
-        let detectedClass = "Unknown";
-        let maxConfidence = 0;
-        let progressInterval;
+    function scoreColorForSkinDynamic(hue, sat, lightness, skinLightness, profile) {
+        let hueDist = Math.abs((hue - profile.idealHueCenter + 180) % 360 - 180);
+        let hueScore = Math.max(0, 100 - (hueDist / (profile.hueWidth/2)) * 100);
+        let contrast = Math.abs(lightness - skinLightness);
+        let contrastScore = 100 - Math.min(100, Math.abs(contrast - profile.idealContrast) * 2.5);
+        let satScore = (sat >= 40 && sat <= 85) ? 100 : (sat < 20 ? 50 : 80 - Math.abs(sat-70)*0.6);
+        let washedPenalty = (Math.abs(lightness - skinLightness) < 12 && sat < 25 && hueDist < 45) ? 35 : 0;
+        let total = (hueScore * 0.55) + (contrastScore * 0.3) + (satScore * 0.15) - washedPenalty;
+        return Math.min(100, Math.max(0, Math.round(total)));
+    }
 
-        // --- 2. TFJS MODEL LOADING ---
-        async function createModel() {
-            const checkpointURL = URL + "model.json"; // model topology
-            const metadataURL = URL + "metadata.json"; // model metadata
+    const colorLibrary = [
+        { name: "Royal Blue", hex: "#4169E1", hsl: { h: 225, s: 73, l: 57 } },
+        { name: "Emerald Green", hex: "#50C878", hsl: { h: 150, s: 51, l: 55 } },
+        { name: "Burgundy", hex: "#800020", hsl: { h: 345, s: 67, l: 25 } },
+        { name: "Mustard Yellow", hex: "#E1AD01", hsl: { h: 46, s: 99, l: 44 } },
+        { name: "Olive Green", hex: "#808000", hsl: { h: 60, s: 100, l: 25 } },
+        { name: "Navy Blue", hex: "#000080", hsl: { h: 240, s: 100, l: 25 } },
+        { name: "Peach", hex: "#FFCBA4", hsl: { h: 24, s: 100, l: 82 } },
+        { name: "Neon Yellow", hex: "#CCFF00", hsl: { h: 72, s: 100, l: 50 } },
+        { name: "Pale Grey", hex: "#D3D3D3", hsl: { h: 0, s: 0, l: 83 } },
+        { name: "Beige", hex: "#F5F5DC", hsl: { h: 60, s: 56, l: 91 } },
+        { name: "Black", hex: "#000000", hsl: { h: 0, s: 0, l: 0 } },
+        { name: "White", hex: "#FFFFFF", hsl: { h: 0, s: 0, l: 100 } },
+        { name: "Terracotta", hex: "#E2725B", hsl: { h: 10, s: 70, l: 62 } },
+        { name: "Sapphire", hex: "#0F52BA", hsl: { h: 219, s: 85, l: 40 } },
+        { name: "Lavender", hex: "#E6E6FA", hsl: { h: 240, s: 67, l: 94 } }
+    ];
 
-            try {
-                const recognizer = speechCommands.create(
-                    "BROWSER_FFT", // Fourier transform type
-                    undefined,     // speech commands vocabulary feature
-                    checkpointURL,
-                    metadataURL
-                );
-                // check that model and metadata are loaded
-                await recognizer.ensureModelLoaded();
-                return recognizer;
-            } catch (e) {
-                console.warn("Real TFJS model not found. Falling back to Mock Engine for UI testing.");
-                return null; // Return null to trigger the graceful fallback demo
-            }
+    function computeAllScoresDynamic(lightness, hueUndertone = 35) {
+        const profile = getDynamicSkinProfile(lightness, hueUndertone);
+        return colorLibrary.map(color => {
+            let score = scoreColorForSkinDynamic(color.hsl.h, color.hsl.s, color.hsl.l, lightness, profile);
+            return { ...color, score };
+        }).sort((a,b) => b.score - a.score);
+    }
+
+    function categorizeColors(scoredColors) {
+        const best = scoredColors.filter(c => c.score >= 80);
+        const good = scoredColors.filter(c => c.score >= 65 && c.score < 80);
+        const neutral = scoredColors.filter(c => c.score >= 45 && c.score < 65);
+        const wash = scoredColors.filter(c => c.score < 45);
+        return { best, good, neutral, wash };
+    }
+
+    function renderSwatchList(colors) {
+        if (!colors.length) return '<span style="opacity:0.6;">—</span>';
+        return colors.map(c => `<div class="swatch"><div class="swatch-color" style="background:${c.hex};"></div>${c.name}</div>`).join('');
+    }
+
+    function drawColorWheel(scoredColors) {
+        const canvas = document.getElementById("colorWheelCanvas");
+        const ctx = canvas.getContext("2d");
+        const w = canvas.width, h = canvas.height;
+        const centerX = w/2, centerY = h/2, radius = w/2 - 4;
+        ctx.clearRect(0, 0, w, h);
+        const angleStep = (Math.PI * 2) / scoredColors.length;
+        for (let i = 0; i < scoredColors.length; i++) {
+            const start = i * angleStep, end = (i+1) * angleStep;
+            const score = scoredColors[i].score;
+            let fillColor = score >= 80 ? "#2e7d64" : (score >= 65 ? "#e6b422" : (score >= 45 ? "#cb7b4a" : "#b13e3e"));
+            ctx.beginPath();
+            ctx.moveTo(centerX, centerY);
+            ctx.arc(centerX, centerY, radius, start, end);
+            ctx.closePath();
+            ctx.fillStyle = fillColor;
+            ctx.fill();
+            ctx.strokeStyle = "#f2efe8";
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+            // draw small labels (first 3 letters) around the wheel
+            ctx.save();
+            ctx.translate(centerX + Math.cos(start+angleStep/2) * (radius*0.75), centerY + Math.sin(start+angleStep/2) * (radius*0.75));
+            ctx.fillStyle = "#1e1b18";
+            ctx.font = "bold 12px system-ui";
+            ctx.fillText(scoredColors[i].name.charAt(0)+scoredColors[i].name.slice(1,4), -12, 4);
+            ctx.restore();
         }
 
-        // --- 3. CORE LOGIC ---
-        recordBtn.addEventListener('click', async () => {
-            if (isRecording) return;
-            
-            resultsCard.style.display = 'none';
-            statusText.innerText = 'Loading TFJS Model into memory...';
-            
-            // Lazy load model on first click
-            if (!recognizer && recognizer !== null) {
-                recognizer = await createModel();
-            }
+        // ----- Draw center image (circular) -----
+        const centerRadius = 38;
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, centerRadius, 0, 2 * Math.PI);
+        ctx.closePath();
+        ctx.clip();
+        if (currentFaceImage && currentFaceImage.complete && currentFaceImage.naturalWidth > 0) {
+            // Draw the original face image (without any VIBGYOR filter) in the center
+            // Scale to fill the circle
+            const imgW = currentFaceImage.naturalWidth;
+            const imgH = currentFaceImage.naturalHeight;
+            const scale = Math.max(centerRadius * 2 / imgW, centerRadius * 2 / imgH);
+            const drawW = imgW * scale;
+            const drawH = imgH * scale;
+            const dx = centerX - drawW/2;
+            const dy = centerY - drawH/2;
+            ctx.drawImage(currentFaceImage, dx, dy, drawW, drawH);
+        } else {
+            ctx.fillStyle = "#ece3d9";
+            ctx.fillRect(centerX - centerRadius, centerY - centerRadius, centerRadius*2, centerRadius*2);
+            ctx.fillStyle = "#2c2b28";
+            ctx.font = "bold 14px system-ui";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("you", centerX, centerY);
+        }
+        ctx.restore();
 
-            startPipeline();
+        // Draw a thin white border around the center circle
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, centerRadius, 0, 2 * Math.PI);
+        ctx.strokeStyle = "white";
+        ctx.lineWidth = 3;
+        ctx.stroke();
+    }
+
+    function refreshUI() {
+        const scored = computeAllScoresDynamic(currentSkinLightness, currentSkinHue);
+        const cats = categorizeColors(scored);
+        document.getElementById("colorCategories").innerHTML = `
+            <div class="cat"><span class="cat-badge">🟢 Best Colors for You ✅</span><div class="color-swatch-list">${renderSwatchList(cats.best)}</div></div>
+            <div class="cat"><span class="cat-badge">🟡 Good Colors 👍</span><div class="color-swatch-list">${renderSwatchList(cats.good)}</div></div>
+            <div class="cat"><span class="cat-badge">⚪ Neutral Colors ➖</span><div class="color-swatch-list">${renderSwatchList(cats.neutral)}</div></div>
+            <div class="cat"><span class="cat-badge">🔴 Colors That May Wash You Out ⚠️</span><div class="color-swatch-list">${renderSwatchList(cats.wash)}</div></div>
+        `;
+        const tbody = document.getElementById("scoreTableBody");
+        tbody.innerHTML = scored.slice(0,12).map(c => `
+            <tr><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:20px;height:20px;background:${c.hex};border-radius:6px;"></div> ${c.name}</div></td>
+            <td>${c.score}/100 <div class="score-bar"><div class="score-fill" style="width:${c.score}%; background:${c.score>=80?'#2e7d64':c.score>=65?'#e6b422':'#b13e3e'}"></div></div></td>
+        `).join('');
+        drawColorWheel(scored);
+        updateOutfitScoreAndAvatar();
+    }
+
+    function updateOutfitScoreAndAvatar() {
+        const slider = document.getElementById("outfitColorSlider");
+        const hue = parseInt(slider.value);
+        const profile = getDynamicSkinProfile(currentSkinLightness, currentSkinHue);
+        const score = scoreColorForSkinDynamic(hue, 70, 55, currentSkinLightness, profile);
+        document.getElementById("outfitScoreDisplay").innerHTML = `${score}/100`;
+        document.getElementById("liveColorPreview").style.backgroundColor = `hsl(${hue}, 70%, 55%)`;
+        drawAvatar(hue);
+    }
+
+    function drawAvatar(hue) {
+        const canvas = document.getElementById("avatarCanvas");
+        const ctx = canvas.getContext("2d");
+        const w = canvas.width, hh = canvas.height;
+        ctx.clearRect(0,0,w,hh);
+        ctx.fillStyle = "#E0BC8C";
+        ctx.beginPath();
+        ctx.arc(w/2, 55, 35, 0, 2*Math.PI);
+        ctx.fill();
+        ctx.fillStyle = "#553322";
+        ctx.beginPath();
+        ctx.arc(w/2-12, 45, 3, 0, 2*Math.PI);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(w/2+12, 45, 3, 0, 2*Math.PI);
+        ctx.fill();
+        ctx.fillStyle = `hsl(${hue}, 70%, 55%)`;
+        ctx.fillRect(w/2-40, 70, 80, 65);
+        ctx.fillStyle = "#aaa";
+        ctx.fillRect(w/2-15, 100, 30, 35);
+        ctx.fillStyle = "#3b2c20";
+        ctx.fillRect(w/2-48, 68, 96, 12);
+    }
+
+    // ------------------- Face detection & skin extraction -------------------
+    let modelsLoaded = false;
+    let currentStream = null;
+    let currentPreviewImage = null;   // store img element for VIBGYOR filter
+
+    async function loadFaceApiModels() {
+        const statusDiv = document.getElementById("analysisStatus");
+        statusDiv.innerText = "Loading AI models...";
+        await faceapi.nets.tinyFaceDetector.loadFromUri("https://raw.githubusercontent.com/justadudewhohas/face-api/master/weights");
+        await faceapi.nets.faceLandmark68Net.loadFromUri("https://raw.githubusercontent.com/justadudewhohas/face-api/master/weights");
+        modelsLoaded = true;
+        statusDiv.innerText = "Ready ✅";
+    }
+
+    function rgbToHsl(r, g, b) {
+        r /= 255, g /= 255, b /= 255;
+        let max = Math.max(r,g,b), min = Math.min(r,g,b);
+        let h, s, l = (max+min)/2;
+        if (max === min) h = s = 0;
+        else {
+            let d = max-min;
+            s = l > 0.5 ? d/(2-max-min) : d/(max+min);
+            switch(max) {
+                case r: h = (g-b)/d + (g<b ? 6 : 0); break;
+                case g: h = (b-r)/d + 2; break;
+                case b: h = (r-g)/d + 4; break;
+            }
+            h *= 60;
+        }
+        return { h: Math.round(h), s: Math.round(s*100), l: Math.round(l*100) };
+    }
+
+    async function extractSkinFromImage(imageElement) {
+        if (!modelsLoaded) await loadFaceApiModels();
+        const detections = await faceapi.detectAllFaces(imageElement, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
+        if (!detections.length) throw new Error("No face detected");
+        const detection = detections[0];
+        const box = detection.detection.box;
+        const canvas = document.createElement("canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = imageElement.width;
+        canvas.height = imageElement.height;
+        ctx.drawImage(imageElement, 0, 0, canvas.width, canvas.height);
+        const foreheadX = box.x + box.width * 0.5;
+        const foreheadY = box.y + box.height * 0.2;
+        const cheekLeftX = box.x + box.width * 0.25;
+        const cheekRightX = box.x + box.width * 0.75;
+        const cheekY = box.y + box.height * 0.65;
+        const samplePoints = [[foreheadX, foreheadY], [cheekLeftX, cheekY], [cheekRightX, cheekY]];
+        let rSum=0,gSum=0,bSum=0;
+        let samples=0;
+        for (let [px,py] of samplePoints) {
+            if (px>=0 && px<canvas.width && py>=0 && py<canvas.height) {
+                const pixel = ctx.getImageData(px, py, 1, 1).data;
+                rSum += pixel[0]; gSum += pixel[1]; bSum += pixel[2];
+                samples++;
+            }
+        }
+        if (samples===0) throw new Error("Could not sample skin");
+        const avg = { r: rSum/samples, g: gSum/samples, b: bSum/samples };
+        const hsl = rgbToHsl(avg.r, avg.g, avg.b);
+        return { lightness: hsl.l, hue: hsl.h };
+    }
+
+    async function applySkinFromImage(imageElement, imgUrl) {
+        try {
+            document.getElementById("analysisStatus").innerText = "Analyzing skin...";
+            const { lightness, hue } = await extractSkinFromImage(imageElement);
+            currentSkinLightness = lightness;
+            currentSkinHue = hue;
+            isAutoDetected = true;
+            refreshUI();
+            document.getElementById("analysisStatus").innerText = `Detected: L=${Math.round(lightness)} (auto)`;
+        } catch(err) {
+            alert("Face detection failed: " + err.message);
+            document.getElementById("analysisStatus").innerText = "Detection failed, using default skin";
+            currentSkinLightness = 52;
+            currentSkinHue = 35;
+            refreshUI();
+        }
+    }
+
+    // VIBGYOR slider: apply hue-rotate to preview image
+    function initVibgyorSlider() {
+        const slider = document.getElementById("vibgyorSlider");
+        slider.addEventListener("input", (e) => {
+            const hueRotate = e.target.value;
+            if (currentPreviewImage) {
+                currentPreviewImage.style.filter = `hue-rotate(${hueRotate}deg)`;
+            }
         });
+    }
 
-        async function startPipeline() {
+    // Reset filter button
+    document.getElementById("resetFilterBtn").onclick = () => {
+        document.getElementById("vibgyorSlider").value = 0;
+        if (currentPreviewImage) {
+            currentPreviewImage.style.filter = "hue-rotate(0deg)";
+        }
+    };
+
+    // ----- UI event wiring -----
+    document.getElementById("uploadBtn").onclick = () => document.getElementById("uploadPhoto").click();
+    document.getElementById("uploadPhoto").onchange = async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const imgUrl = URL.createObjectURL(file);
+        const img = new Image();
+        img.onload = async () => {
+            URL.revokeObjectURL(imgUrl);
+            // Store the original image for wheel center
+            currentFaceImage = img;
+            await applySkinFromImage(img, imgUrl);
+            const previewDiv = document.getElementById("previewArea");
+            previewDiv.innerHTML = `<img src="${imgUrl}" class="preview-img" id="facePreviewImg">`;
+            currentPreviewImage = document.getElementById("facePreviewImg");
+            const currentHue = document.getElementById("vibgyorSlider").value;
+            currentPreviewImage.style.filter = `hue-rotate(${currentHue}deg)`;
+            refreshUI(); // redraw wheel with new center image
+        };
+        img.src = imgUrl;
+    };
+
+    // webcam
+    let videoElem = document.getElementById("video");
+    let webcamActive = false;
+    document.getElementById("webcamBtn").onclick = async () => {
+        document.getElementById("webcamPanel").style.display = "block";
+        if (!webcamActive) {
             try {
-                // Request raw microphone access for decibel calculation
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                setupDecibelTracker(stream);
-
-                isRecording = true;
-                recordBtn.classList.add('recording');
-                progressContainer.style.display = 'block';
-                progressBar.style.width = '0%';
-                statusText.innerText = 'Listening... Rev the engine!';
-
-                // Start Progress Bar
-                let elapsed = 0;
-                progressInterval = setInterval(() => {
-                    elapsed += 100;
-                    progressBar.style.width = (elapsed / RECORD_DURATION_MS) * 100 + '%';
-                }, 100);
-
-                // If real TFJS model loaded, start classifying in real time
-                if (recognizer) {
-                    const classLabels = recognizer.wordLabels(); 
-                    recognizer.listen(result => {
-                        // Find highest confidence class during this window
-                        let scores = result.scores;
-                        let highestIndex = scores.indexOf(Math.max(...scores));
-                        
-                        if (scores[highestIndex] > maxConfidence) {
-                            maxConfidence = scores[highestIndex];
-                            detectedClass = classLabels[highestIndex];
-                        }
-                    }, {
-                        includeSpectrogram: false,
-                        probabilityThreshold: 0.75,
-                        invokeCallbackOnNoiseAndUnknown: true,
-                        overlapFactor: 0.50
-                    });
-                }
-
-                // Stop after 5 seconds
-                setTimeout(() => {
-                    stopPipeline(stream);
-                }, RECORD_DURATION_MS);
-
-            } catch (err) {
-                console.error(err);
-                statusText.innerText = "Error: Microphone permission denied.";
-            }
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                videoElem.srcObject = stream;
+                currentStream = stream;
+                webcamActive = true;
+            } catch(err) { alert("Camera error: "+err.message); }
         }
+    };
+    document.getElementById("captureBtn").onclick = async () => {
+        if (!webcamActive || !videoElem.videoWidth) { alert("Start webcam first"); return; }
+        const canvas = document.createElement("canvas");
+        canvas.width = videoElem.videoWidth;
+        canvas.height = videoElem.videoHeight;
+        canvas.getContext("2d").drawImage(videoElem, 0, 0, canvas.width, canvas.height);
+        const img = new Image();
+        img.onload = async () => {
+            currentFaceImage = img;
+            await applySkinFromImage(img, img.src);
+            const previewDiv = document.getElementById("previewArea");
+            previewDiv.innerHTML = `<img src="${img.src}" class="preview-img" id="facePreviewImg">`;
+            currentPreviewImage = document.getElementById("facePreviewImg");
+            const currentHue = document.getElementById("vibgyorSlider").value;
+            currentPreviewImage.style.filter = `hue-rotate(${currentHue}deg)`;
+            refreshUI();
+        };
+        img.src = canvas.toDataURL();
+    };
+    document.getElementById("stopWebcamBtn").onclick = () => {
+        if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+        videoElem.srcObject = null;
+        webcamActive = false;
+        document.getElementById("webcamPanel").style.display = "none";
+    };
 
-        function setupDecibelTracker(stream) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            analyser = audioContext.createAnalyser();
-            microphone = audioContext.createMediaStreamSource(stream);
-            microphone.connect(analyser);
-            analyser.fftSize = 256;
-            
-            const bufferLength = analyser.frequencyBinCount;
-            const dataArray = new Uint8Array(bufferLength);
-            maxVolume = 0;
+    // outfit slider event
+    document.getElementById("outfitColorSlider").addEventListener("input", updateOutfitScoreAndAvatar);
 
-            function track() {
-                if (!isRecording) return;
-                analyser.getByteFrequencyData(dataArray);
-                let sum = 0;
-                for (let i = 0; i < bufferLength; i++) { sum += dataArray[i]; }
-                let avg = sum / bufferLength;
-                if (avg > maxVolume) maxVolume = avg; // Track peak volume
-                requestAnimationFrame(track);
-            }
-            track();
-        }
-
-        function stopPipeline(stream) {
-            isRecording = false;
-            clearInterval(progressInterval);
-            recordBtn.classList.remove('recording');
-            progressContainer.style.display = 'none';
-            statusText.innerText = 'Processing completely on-device...';
-
-            // Clean up Audio Context
-            stream.getTracks().forEach(track => track.stop());
-            if (audioContext && audioContext.state !== 'closed') {
-                audioContext.close();
-            }
-            if (recognizer) {
-                recognizer.stopListening();
-            }
-
-            calculateAndShowResults();
-        }
-
-        function calculateAndShowResults() {
-            // 1. Calculate Base Decibel Score (Mapping peak volume 0-255 to 0-85)
-            let baseScore = Math.min(85, Math.round((maxVolume / 255) * 85 * 1.5)); 
-            if (baseScore < 10) baseScore = Math.floor(Math.random() * 20) + 10; 
-
-            // 2. Handle AI Bike Classification & Character Bonus
-            let characterBonus = 0;
-
-            // If the user hasn't put in their real Teachable Machine URL yet, Mock the AI
-            if (!recognizer) {
-                if (baseScore > 75) { detectedClass = "Royal Enfield Classic 350"; maxConfidence = 0.92; }
-                else if (baseScore > 50) { detectedClass = "KTM Duke 390"; maxConfidence = 0.85; }
-                else { detectedClass = "TVS XL Super"; maxConfidence = 0.78; }
-            }
-
-            // Assign Bonus based on AI Output (The "Character" Bonus from your architecture)
-            if (detectedClass.includes("Royal Enfield")) characterBonus = 15;
-            else if (detectedClass.includes("KTM")) characterBonus = 10;
-            else if (detectedClass.includes("Yamaha")) characterBonus = 8;
-            else characterBonus = 2; // Commuter bikes get low bonus
-
-            // 3. Final Roar Score Calculation
-            let finalScore = Math.min(100, baseScore + characterBonus);
-
-            // 4. Update UI
-            roarScoreEl.innerText = finalScore;
-            bonusTextEl.innerText = `+${characterBonus} Character Bonus (${detectedClass})`;
-            bikeClassEl.innerText = `${detectedClass} (Confidence: ${Math.round(maxConfidence * 100)}%)`;
-            
-            // 5. Fire Trash Talk Engine
-            let category = 'low';
-            if (finalScore > 75) category = 'high';
-            else if (finalScore > 40) category = 'medium';
-
-            const phrases = trashTalkTemplates[category];
-            trashTalkEl.innerText = phrases[Math.floor(Math.random() * phrases.length)];
-
-            resultsCard.style.display = 'block';
-            statusText.innerText = 'Tap mic to test another bike!';
-            
-            // Reset state for next run
-            maxConfidence = 0;
-            detectedClass = "Unknown";
-        }
-    </script>
+    // Initialize
+    loadFaceApiModels().then(() => {
+        initVibgyorSlider();
+        refreshUI();
+    }).catch(err => console.warn("Model load error", err));
+</script>
 </body>
 </html>
