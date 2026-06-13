@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Your Best Colors – Face Detection + Colour Wheel</title>
+    <title>Your Best Colors – Drag & Match + Colour Wheel</title>
     <!-- MediaPipe Face Detection -->
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js" crossorigin="anonymous"></script>
     <style>
@@ -18,13 +18,13 @@
             color: #2c2b28;
         }
         .container {
-            max-width: 1400px;
+            max-width: 1500px;
             margin: 0 auto;
         }
         h1 {
             font-size: 1.8rem;
             font-weight: 600;
-            margin: 0 0 0.25rem 0;
+            margin: 0 0 0.25rem;
             display: flex;
             align-items: center;
             gap: 8px;
@@ -34,7 +34,7 @@
             color: #5b5b56;
             border-left: 3px solid #c9a87b;
             padding-left: 16px;
-            margin: 12px 0 24px 0;
+            margin: 12px 0 24px;
         }
         .two-columns {
             display: flex;
@@ -43,7 +43,7 @@
         }
         .left-panel {
             flex: 1.2;
-            min-width: 300px;
+            min-width: 320px;
         }
         .right-panel {
             flex: 2;
@@ -92,10 +92,29 @@
         }
         video, .preview-img {
             width: 100%;
-            max-width: 240px;
+            max-width: 260px;
             border-radius: 20px;
             border: 1px solid #ddd;
             background: #e9e2d6;
+            cursor: crosshair;
+        }
+        .swatch-strip {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin: 16px 0 8px;
+        }
+        .drag-swatch {
+            width: 48px;
+            height: 48px;
+            border-radius: 24px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            cursor: grab;
+            transition: 0.1s;
+            border: 2px solid white;
+        }
+        .drag-swatch:active {
+            cursor: grabbing;
         }
         .manual-skin-area, .vibgyor-slider-area {
             margin: 16px 0 8px;
@@ -107,19 +126,17 @@
             color: #5b5b56;
             margin-bottom: 8px;
         }
-        .vibgyor-slider {
+        .vibgyor-slider, .skin-slider {
             width: 100%;
             height: 12px;
             border-radius: 12px;
-            background: linear-gradient(90deg, #8B00FF, #4B0082, #0000FF, #00FF00, #FFFF00, #FF7F00, #FF0000);
             -webkit-appearance: none;
         }
+        .vibgyor-slider {
+            background: linear-gradient(90deg, #8B00FF, #4B0082, #0000FF, #00FF00, #FFFF00, #FF7F00, #FF0000);
+        }
         .skin-slider {
-            width: 100%;
-            height: 12px;
-            border-radius: 12px;
             background: linear-gradient(90deg, #f7e5cf, #e0ac7a, #c17a4a, #8b4a2a, #4a2512);
-            -webkit-appearance: none;
         }
         input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
@@ -238,6 +255,26 @@
             padding: 6px;
             border-radius: 16px;
         }
+        .drag-cursor {
+            position: fixed;
+            pointer-events: none;
+            z-index: 9999;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 0 0 2px black;
+            transition: 0.02s linear;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.6);
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            text-align: center;
+            backdrop-filter: blur(4px);
+        }
         .note {
             font-size: 0.75rem;
             color: #7f6e5c;
@@ -251,7 +288,7 @@
 <body>
 <div class="container">
     <h1>🎨 Find Your Best Colors <span class="status-badge" id="analysisStatus">Loading...</span></h1>
-    <div class="subhead">Upload a selfie or use webcam – AI detects face & eyes, extracts skin tone → shows your best colors.</div>
+    <div class="subhead">Upload a selfie or use webcam – AI detects your skin tone → drag any color swatch over your face to see how it matches.</div>
 
     <div class="two-columns">
         <div class="left-panel">
@@ -264,12 +301,18 @@
                     <button id="retryDetectionBtn" style="background:#dbcebc;">🔄 Redetect</button>
                 </div>
                 <div id="webcamPanel" style="display:none;" class="webcam-container">
-                    <video id="video" width="240" height="180" autoplay muted></video>
+                    <video id="video" width="260" height="auto" autoplay muted></video>
                     <button id="captureBtn">📸 Capture & Analyze</button>
                     <button id="stopWebcamBtn">⏹️ Stop Webcam</button>
                 </div>
-                <div id="previewArea"></div>
+                <div id="previewArea" style="position:relative; display:inline-block;"></div>
                 <div class="debug-box" id="debugInfo">📌 Face detection status will appear here.</div>
+            </div>
+
+            <div class="card">
+                <div class="card-title">🎨 Drag a color across your face</div>
+                <div class="swatch-strip" id="dragSwatchStrip"></div>
+                <div style="font-size:0.7rem;">👇 Click & drag any swatch over your face photo – a colored dot follows your cursor, showing the color name & score.</div>
             </div>
 
             <div class="card">
@@ -281,7 +324,6 @@
                 <div class="manual-skin-area">
                     <div class="slider-label"><span>☀️ Manual skin lightness (fallback)</span><span id="skinLightnessValue">52</span></div>
                     <input type="range" id="manualSkinSlider" class="skin-slider" min="0" max="100" value="52">
-                    <div style="font-size:0.7rem;">If auto‑detection fails, drag this to match your skin tone.</div>
                 </div>
                 <div class="color-wheel-container">
                     <canvas id="colorWheelCanvas" width="280" height="280"></canvas>
@@ -327,19 +369,19 @@
         </div>
     </div>
     <div class="note">
-        ✅ MediaPipe Face Detection works offline after first load. Your face is used only for skin tone extraction.<br>
-        🌈 VIBGYOR slider changes preview only – analysis uses the original image.
+        ✅ MediaPipe Face Detection works offline. Drag any color swatch over your face – the floating circle shows if that color is <strong>Best/Good/Neutral/Wash Out</strong> for your skin.<br>
+        🌈 VIBGYOR slider changes preview only – analysis uses original image.
     </div>
 </div>
 
 <script>
     // --------------------------------------------------------------
-    // COLOR SCORING ENGINE (unchanged logic)
+    // COLOR SCORING ENGINE (unchanged)
     // --------------------------------------------------------------
     let currentSkinLightness = 52;
     let currentSkinHue = 35;
-    let currentFaceImage = null;      // for wheel center
-    let currentPreviewImage = null;   // for VIBGYOR filter
+    let currentFaceImage = null;
+    let currentPreviewImage = null;
 
     function getDynamicSkinProfile(lightness, hue = 35) {
         if (lightness > 68) return { skinLightness: lightness, idealHueCenter: (hue>20)?55:340, hueWidth:70, idealContrast:38 };
@@ -414,7 +456,6 @@
             ctx.fillText(scoredColors[i].name.slice(0,4), -12, 4);
             ctx.restore();
         }
-        // center photo
         const centerR = 38;
         ctx.save();
         ctx.beginPath();
@@ -456,10 +497,11 @@
         const tbody = document.getElementById("scoreTableBody");
         tbody.innerHTML = scored.slice(0,12).map(c => `
             <tr><td><div style="display:flex;align-items:center;gap:8px;"><div style="width:20px;height:20px;background:${c.hex};border-radius:6px;"></div> ${c.name}</div></td>
-            <td>${c.score}/100 <div class="score-bar"><div class="score-fill" style="width:${c.score}%; background:${c.score>=80?'#2e7d64':c.score>=65?'#e6b422':'#b13e3e'}"></div></div></td></tr>
+            <td>${c.score}/100 <div class="score-bar"><div class="score-fill" style="width:${c.score}%; background:${c.score>=80?'#2e7d64':c.score>=65?'#e6b422':'#b13e3e'}"></div></div></td>
         `).join('');
         drawColorWheel(scored);
         updateOutfitScore();
+        updateDragSwatches(scored);
     }
 
     function updateOutfitScore() {
@@ -496,6 +538,86 @@
     }
 
     // --------------------------------------------------------------
+    // DRAG COLOR SWATCHES OVER FACE (NEW VIRAL FEATURE)
+    // --------------------------------------------------------------
+    let activeDragColor = null;
+    let dragElement = null;
+
+    function updateDragSwatches(scoredColors) {
+        const container = document.getElementById("dragSwatchStrip");
+        // show top 8 best + good colors for dragging
+        const topColors = scoredColors.slice(0, 10);
+        container.innerHTML = topColors.map(c => `
+            <div class="drag-swatch" style="background:${c.hex};" data-color-name="${c.name}" data-color-score="${c.score}" data-color-hex="${c.hex}" data-color-hsl='${JSON.stringify(c.hsl)}'>
+            </div>
+        `).join('');
+        attachDragEvents();
+    }
+
+    function attachDragEvents() {
+        const swatches = document.querySelectorAll(".drag-swatch");
+        swatches.forEach(swatch => {
+            swatch.addEventListener("mousedown", startDrag);
+            swatch.addEventListener("touchstart", startDrag, {passive: false});
+        });
+    }
+
+    function startDrag(e) {
+        e.preventDefault();
+        const target = e.target.closest(".drag-swatch");
+        if(!target) return;
+        const colorName = target.getAttribute("data-color-name");
+        const colorScore = parseInt(target.getAttribute("data-color-score"));
+        const colorHex = target.getAttribute("data-color-hex");
+        const colorHsl = JSON.parse(target.getAttribute("data-color-hsl"));
+        let category = "";
+        if(colorScore >= 80) category = "✅ Best";
+        else if(colorScore >= 65) category = "👍 Good";
+        else if(colorScore >= 45) category = "➖ Neutral";
+        else category = "⚠️ Wash Out";
+        
+        activeDragColor = { name: colorName, score: colorScore, category, hex: colorHex, hsl: colorHsl };
+        
+        // create floating circle
+        if(dragElement) dragElement.remove();
+        dragElement = document.createElement("div");
+        dragElement.className = "drag-cursor";
+        dragElement.style.backgroundColor = colorHex;
+        dragElement.style.opacity = "0.9";
+        dragElement.innerHTML = `<div style="background:rgba(0,0,0,0.6); border-radius:20px; padding:2px 6px;">${colorName}<br>${colorScore}</div>`;
+        document.body.appendChild(dragElement);
+        
+        function onMove(e) {
+            if(!activeDragColor) return;
+            let clientX, clientY;
+            if(e.touches) {
+                clientX = e.touches[0].clientX;
+                clientY = e.touches[0].clientY;
+            } else {
+                clientX = e.clientX;
+                clientY = e.clientY;
+            }
+            dragElement.style.left = (clientX - 25) + "px";
+            dragElement.style.top = (clientY - 25) + "px";
+        }
+        
+        function endDrag() {
+            activeDragColor = null;
+            if(dragElement) dragElement.remove();
+            dragElement = null;
+            window.removeEventListener("mousemove", onMove);
+            window.removeEventListener("mouseup", endDrag);
+            window.removeEventListener("touchmove", onMove);
+            window.removeEventListener("touchend", endDrag);
+        }
+        
+        window.addEventListener("mousemove", onMove);
+        window.addEventListener("mouseup", endDrag);
+        window.addEventListener("touchmove", onMove);
+        window.addEventListener("touchend", endDrag);
+    }
+
+    // --------------------------------------------------------------
     // MEDIAPIPE FACE DETECTION + SKIN EXTRACTION
     // --------------------------------------------------------------
     let faceDetector = null;
@@ -505,7 +627,7 @@
         const statusSpan = document.getElementById("analysisStatus");
         statusSpan.innerText = "Loading MediaPipe...";
         try {
-            const vision = await window.vision; // from bundle
+            const vision = await window.vision;
             const fileset = await vision.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm");
             faceDetector = await vision.FaceDetector.createFromOptions(fileset, {
                 baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float32/1/blaze_face_short_range.tflite", delegate: "CPU" },
@@ -523,21 +645,17 @@
         }
     }
 
-    // Extract skin tone from detected face bounding box
     async function extractSkinFromImageWithMediaPipe(imageElement) {
         if(!mediapipeReady || !faceDetector) throw new Error("Face detector not ready");
-        // convert HTMLImageElement to canvas for MediaPipe
         const canvas = document.createElement("canvas");
         canvas.width = imageElement.width;
         canvas.height = imageElement.height;
         const ctx = canvas.getContext("2d");
         ctx.drawImage(imageElement, 0, 0);
-        const imageData = canvas.toDataURL();
         const mpImage = await window.vision.ImageSource(imageElement);
         const detections = await faceDetector.detect(mpImage);
         if(!detections.detections || detections.detections.length===0) throw new Error("No face found");
         const box = detections.detections[0].boundingBox;
-        // sample forehead (upper 25% of face) and cheeks
         const foreheadX = box.originX + box.width * 0.5;
         const foreheadY = box.originY + box.height * 0.2;
         const cheekLeftX = box.originX + box.width * 0.25;
@@ -554,11 +672,8 @@
         }
         if(samples===0) throw new Error("Sampling failed");
         const avgR = rSum/samples, avgG = gSum/samples, avgB = bSum/samples;
-        // convert RGB to lightness (simple luminance)
         const lightness = 0.2126*avgR + 0.7152*avgG + 0.0722*avgB;
-        // map to 0-100 range
         const normLightness = Math.min(100, Math.max(0, lightness/255*100));
-        // also get hue from RGB
         const rgbToHsl = (r,g,b) => {
             r/=255; g/=255; b/=255;
             let max=Math.max(r,g,b), min=Math.min(r,g,b);
@@ -596,7 +711,6 @@
             console.warn(err);
             debugDiv.innerHTML = `⚠️ Face detection failed: ${err.message}. Use manual slider below.`;
             document.getElementById("analysisStatus").innerHTML = `⚠️ Detection failed – using manual slider`;
-            // keep current skin lightness as is (user can adjust slider)
         }
     }
 
@@ -612,21 +726,17 @@
         img.onload = async () => {
             URL.revokeObjectURL(url);
             currentFaceImage = img;
-            // show preview
             const previewDiv = document.getElementById("previewArea");
-            previewDiv.innerHTML = `<img src="${url}" class="preview-img" id="facePreviewImg">`;
+            previewDiv.innerHTML = `<img src="${url}" class="preview-img" id="facePreviewImg" style="max-width:260px;">`;
             currentPreviewImage = document.getElementById("facePreviewImg");
-            // apply VIBGYOR filter if any
             const hueVal = document.getElementById("vibgyorSlider").value;
             currentPreviewImage.style.filter = `hue-rotate(${hueVal}deg)`;
-            // analyze
             await analyzeAndSetSkin(img);
-            refreshUI(); // ensure wheel redraws with new center image
+            refreshUI();
         };
         img.src = url;
     };
 
-    // Webcam logic
     let currentStream = null;
     let videoElem = document.getElementById("video");
     document.getElementById("webcamBtn").onclick = async () => {
@@ -649,7 +759,7 @@
         img.onload = async () => {
             currentFaceImage = img;
             const previewDiv = document.getElementById("previewArea");
-            previewDiv.innerHTML = `<img src="${img.src}" class="preview-img" id="facePreviewImg">`;
+            previewDiv.innerHTML = `<img src="${img.src}" class="preview-img" id="facePreviewImg" style="max-width:260px;">`;
             currentPreviewImage = document.getElementById("facePreviewImg");
             const hueVal = document.getElementById("vibgyorSlider").value;
             currentPreviewImage.style.filter = `hue-rotate(${hueVal}deg)`;
@@ -664,17 +774,11 @@
         currentStream = null;
         document.getElementById("webcamPanel").style.display = "none";
     };
-
-    // Retry detection on current face image
     document.getElementById("retryDetectionBtn").onclick = async () => {
-        if(currentFaceImage) {
-            await analyzeAndSetSkin(currentFaceImage);
-        } else {
-            document.getElementById("debugInfo").innerHTML = "No image loaded. Please upload or capture first.";
-        }
+        if(currentFaceImage) await analyzeAndSetSkin(currentFaceImage);
+        else document.getElementById("debugInfo").innerHTML = "No image loaded. Please upload or capture first.";
     };
 
-    // Manual skin slider
     const manualSlider = document.getElementById("manualSkinSlider");
     manualSlider.addEventListener("input", (e) => {
         const val = parseInt(e.target.value);
@@ -684,19 +788,14 @@
         document.getElementById("analysisStatus").innerHTML = `Manual mode: L=${val}`;
     });
 
-    // VIBGYOR filter
     document.getElementById("vibgyorSlider").addEventListener("input", (e) => {
         const deg = e.target.value;
         if(currentPreviewImage) currentPreviewImage.style.filter = `hue-rotate(${deg}deg)`;
     });
 
-    // Outfit slider
     document.getElementById("outfitColorSlider").addEventListener("input", updateOutfitScore);
 
-    // Initialization
-    initMediaPipe().then(() => {
-        refreshUI();
-    });
+    initMediaPipe().then(() => refreshUI());
 </script>
 </body>
 </html>
