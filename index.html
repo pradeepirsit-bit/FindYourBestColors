@@ -3,10 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
-    <title>Your Best Colors – Face in Colour Wheel + VIBGYOR</title>
-    <!-- Face API JS -->
-    <script defer src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.18.0/dist/tf.min.js"></script>
-    <script defer src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <title>Your Best Colors – Face Detection + Colour Wheel</title>
+    <!-- MediaPipe Face Detection -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision/vision_bundle.js" crossorigin="anonymous"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -26,7 +25,6 @@
             font-size: 1.8rem;
             font-weight: 600;
             margin: 0 0 0.25rem 0;
-            letter-spacing: -0.3px;
             display: flex;
             align-items: center;
             gap: 8px;
@@ -37,7 +35,6 @@
             border-left: 3px solid #c9a87b;
             padding-left: 16px;
             margin: 12px 0 24px 0;
-            font-weight: 400;
         }
         .two-columns {
             display: flex;
@@ -56,9 +53,9 @@
             background: white;
             border-radius: 32px;
             padding: 20px 24px;
-            box-shadow: 0 8px 20px rgba(0,0,0,0.03), 0 2px 6px rgba(0,0,0,0.05);
             margin-bottom: 24px;
             border: 1px solid #eee6dc;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.03);
         }
         .card-title {
             font-weight: 600;
@@ -68,54 +65,16 @@
             align-items: center;
             gap: 8px;
         }
-        /* VIBGYOR slider */
-        .vibgyor-slider-area, .manual-skin-area {
-            margin: 16px 0 8px;
-        }
-        .vibgyor-label, .manual-skin-label {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.75rem;
-            color: #5b5b56;
-            margin-bottom: 8px;
-        }
-        .vibgyor-slider {
-            width: 100%;
-            -webkit-appearance: none;
-            height: 12px;
-            border-radius: 12px;
-            background: linear-gradient(90deg, #8B00FF, #4B0082, #0000FF, #00FF00, #FFFF00, #FF7F00, #FF0000);
-            outline: none;
-        }
-        .vibgyor-slider::-webkit-slider-thumb, .skin-slider::-webkit-slider-thumb {
-            -webkit-appearance: none;
-            width: 24px;
-            height: 24px;
-            border-radius: 50%;
-            background: white;
-            border: 2px solid #2c2b28;
-            cursor: pointer;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-        }
-        .skin-slider {
-            width: 100%;
-            -webkit-appearance: none;
-            height: 12px;
-            border-radius: 12px;
-            background: linear-gradient(90deg, #f7e5cf, #e0ac7a, #c17a4a, #8b4a2a, #4a2512);
-            outline: none;
-        }
         .photo-controls {
             display: flex;
             flex-wrap: wrap;
             gap: 12px;
             margin: 16px 0 12px;
-            align-items: center;
         }
         button {
             background: #e6dfd5;
             border: none;
-            padding: 8px 16px;
+            padding: 8px 18px;
             border-radius: 40px;
             font-weight: 500;
             cursor: pointer;
@@ -131,22 +90,53 @@
             flex-direction: column;
             gap: 12px;
         }
-        video, #uploadedImagePreview, #capturedCanvas {
+        video, .preview-img {
             width: 100%;
             max-width: 240px;
             border-radius: 20px;
             border: 1px solid #ddd;
             background: #e9e2d6;
         }
+        .manual-skin-area, .vibgyor-slider-area {
+            margin: 16px 0 8px;
+        }
+        .slider-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: #5b5b56;
+            margin-bottom: 8px;
+        }
+        .vibgyor-slider {
+            width: 100%;
+            height: 12px;
+            border-radius: 12px;
+            background: linear-gradient(90deg, #8B00FF, #4B0082, #0000FF, #00FF00, #FFFF00, #FF7F00, #FF0000);
+            -webkit-appearance: none;
+        }
+        .skin-slider {
+            width: 100%;
+            height: 12px;
+            border-radius: 12px;
+            background: linear-gradient(90deg, #f7e5cf, #e0ac7a, #c17a4a, #8b4a2a, #4a2512);
+            -webkit-appearance: none;
+        }
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: white;
+            border: 2px solid #2c2b28;
+            cursor: pointer;
+        }
         .color-wheel-container {
             text-align: center;
             margin: 10px 0;
-            position: relative;
         }
         canvas {
             max-width: 100%;
             height: auto;
-            background: #f2efe8;
             border-radius: 50%;
             box-shadow: 0 8px 18px rgba(0,0,0,0.1);
         }
@@ -186,15 +176,14 @@
             align-items: center;
             background: #f3f0ea;
             border-radius: 40px;
-            padding: 4px 12px 4px 8px;
-            font-size: 0.8rem;
+            padding: 4px 12px;
             gap: 8px;
+            font-size: 0.8rem;
         }
         .swatch-color {
             width: 22px;
             height: 22px;
             border-radius: 22px;
-            border: 1px solid rgba(0,0,0,0.1);
         }
         .score-table {
             width: 100%;
@@ -229,31 +218,10 @@
             gap: 24px;
             margin-top: 16px;
         }
-        .avatar-canvas {
-            background: #dbd2c4;
-            border-radius: 32px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-        }
-        .slider-control {
-            flex: 1;
-            min-width: 180px;
-        }
-        input[type="range"] {
-            width: 100%;
-            margin: 12px 0;
-        }
         .outfit-score {
             font-size: 2rem;
             font-weight: 700;
             margin: 10px 0;
-        }
-        .note {
-            font-size: 0.75rem;
-            color: #7f6e5c;
-            margin-top: 24px;
-            text-align: center;
-            border-top: 1px solid #e2d9cf;
-            padding-top: 20px;
         }
         .status-badge {
             background: #eae3d8;
@@ -262,25 +230,30 @@
             font-size: 0.7rem;
             display: inline-block;
         }
-        .preview-img {
-            max-width: 200px;
-            border-radius: 20px;
-            transition: filter 0.05s linear;
-        }
-        .error-msg {
-            color: #b13e3e;
+        .debug-box {
             font-size: 0.7rem;
-            margin-top: 5px;
+            color: #5b5b56;
+            margin-top: 8px;
+            background: #f9f6f0;
+            padding: 6px;
+            border-radius: 16px;
+        }
+        .note {
+            font-size: 0.75rem;
+            color: #7f6e5c;
+            text-align: center;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #e2d9cf;
         }
     </style>
 </head>
 <body>
 <div class="container">
-    <h1>🎨 Find Your Best Colors <span class="status-badge" id="analysisStatus">Ready</span></h1>
-    <div class="subhead">Upload a selfie or use webcam – AI extracts your skin tone, then shows your best colors. No judgement.</div>
+    <h1>🎨 Find Your Best Colors <span class="status-badge" id="analysisStatus">Loading...</span></h1>
+    <div class="subhead">Upload a selfie or use webcam – AI detects face & eyes, extracts skin tone → shows your best colors.</div>
 
     <div class="two-columns">
-        <!-- LEFT: face input + VIBGYOR slider + wheel -->
         <div class="left-panel">
             <div class="card">
                 <div class="card-title">📸 1. Provide your face</div>
@@ -288,7 +261,7 @@
                     <input type="file" id="uploadPhoto" accept="image/jpeg,image/png" style="display:none">
                     <button id="uploadBtn" class="primary">📁 Upload Photo</button>
                     <button id="webcamBtn">🎥 Use Webcam</button>
-                    <button id="resetFilterBtn" style="background:#dbcebc;">✨ Reset filter</button>
+                    <button id="retryDetectionBtn" style="background:#dbcebc;">🔄 Redetect</button>
                 </div>
                 <div id="webcamPanel" style="display:none;" class="webcam-container">
                     <video id="video" width="240" height="180" autoplay muted></video>
@@ -296,28 +269,22 @@
                     <button id="stopWebcamBtn">⏹️ Stop Webcam</button>
                 </div>
                 <div id="previewArea"></div>
-                <div style="font-size:0.75rem; margin-top:8px;">✅ After upload/capture, face is detected → skin tone extracted → color recommendations update.</div>
+                <div class="debug-box" id="debugInfo">📌 Face detection status will appear here.</div>
             </div>
 
             <div class="card">
-                <div class="card-title">🌈 2. VIBGYOR color filter (fun effect)</div>
+                <div class="card-title">🌈 VIBGYOR filter (fun effect)</div>
                 <div class="vibgyor-slider-area">
-                    <div class="vibgyor-label">
-                        <span>Violet</span> <span>Indigo</span> <span>Blue</span> <span>Green</span> <span>Yellow</span> <span>Orange</span> <span>Red</span>
-                    </div>
-                    <input type="range" id="vibgyorSlider" class="vibgyor-slider" min="0" max="360" step="1" value="0">
-                    <div style="font-size:0.7rem; margin-top:6px;">Slide to apply a rainbow color cast to your face photo (does not affect analysis).</div>
+                    <div class="slider-label"><span>Violet</span><span>Indigo</span><span>Blue</span><span>Green</span><span>Yellow</span><span>Orange</span><span>Red</span></div>
+                    <input type="range" id="vibgyorSlider" class="vibgyor-slider" min="0" max="360" value="0">
                 </div>
                 <div class="manual-skin-area">
-                    <div class="manual-skin-label">
-                        <span>☀️ Manual skin lightness (fallback)</span>
-                        <span id="skinLightnessValue">52</span>
-                    </div>
-                    <input type="range" id="manualSkinSlider" class="skin-slider" min="0" max="100" step="1" value="52">
-                    <div style="font-size:0.7rem;">If face detection fails, drag this to manually adjust your skin tone → updates all scores.</div>
+                    <div class="slider-label"><span>☀️ Manual skin lightness (fallback)</span><span id="skinLightnessValue">52</span></div>
+                    <input type="range" id="manualSkinSlider" class="skin-slider" min="0" max="100" value="52">
+                    <div style="font-size:0.7rem;">If auto‑detection fails, drag this to match your skin tone.</div>
                 </div>
                 <div class="color-wheel-container">
-                    <canvas id="colorWheelCanvas" width="280" height="280" style="width:280px; height:280px"></canvas>
+                    <canvas id="colorWheelCanvas" width="280" height="280"></canvas>
                     <div class="legend">
                         <span style="background:#2e7d64;"></span> Best&nbsp;&nbsp;
                         <span style="background:#e6b422;"></span> Good&nbsp;&nbsp;
@@ -327,17 +294,16 @@
                 </div>
             </div>
 
-            <div class="card" id="categoriesCard">
+            <div class="card">
                 <div class="card-title">🏆 Color recommendations</div>
-                <div class="color-categories" id="colorCategories"></div>
+                <div id="colorCategories" class="color-categories"></div>
             </div>
         </div>
 
-        <!-- RIGHT: score table + viral slider -->
         <div class="right-panel">
             <div class="card">
                 <div class="card-title">📊 Color score (0–100)</div>
-                <table class="score-table" id="scoreTable">
+                <table class="score-table">
                     <thead><tr><th>Color</th><th>Score</th></tr></thead>
                     <tbody id="scoreTableBody"></tbody>
                 </table>
@@ -345,52 +311,40 @@
 
             <div class="card">
                 <div class="card-title">✨ VIRAL FEATURE ✨</div>
-                <div style="font-weight:500;">"How attractive does this outfit color look on me?"</div>
+                <div>"How attractive does this outfit color look on me?"</div>
                 <div class="avatar-area">
-                    <canvas id="avatarCanvas" width="140" height="140" style="width:140px; height:140px; border-radius: 24px;"></canvas>
+                    <canvas id="avatarCanvas" width="140" height="140"></canvas>
                     <div class="slider-control">
-                        <label style="font-weight:500;">Pick outfit color</label>
+                        <label>Pick outfit color</label>
                         <input type="range" id="outfitColorSlider" min="0" max="360" step="1" value="210">
-                        <div style="display:flex; gap:12px; flex-wrap:wrap; margin:10px 0;">
-                            <div style="background:#2c6e9e; width:40px; height:40px; border-radius:12px;" id="liveColorPreview"></div>
+                        <div style="display:flex; gap:12px; margin:10px 0;">
+                            <div style="width:40px;height:40px;border-radius:12px;" id="liveColorPreview"></div>
                             <div class="outfit-score" id="outfitScoreDisplay">--</div>
                         </div>
                     </div>
                 </div>
-                <p style="margin-top:12px; font-size:0.75rem;">Slide to change shirt color → score based on your detected or manually selected skin tone.</p>
             </div>
         </div>
     </div>
     <div class="note">
-        🔬 Face detection uses corrected model URLs. If detection fails, use the manual skin lightness slider.<br>
-        🌈 VIBGYOR slider only affects the preview image – the wheel centre shows your original face.
+        ✅ MediaPipe Face Detection works offline after first load. Your face is used only for skin tone extraction.<br>
+        🌈 VIBGYOR slider changes preview only – analysis uses the original image.
     </div>
 </div>
 
 <script>
     // --------------------------------------------------------------
-    // SCIENTIFIC COLOR SCORING ENGINE (based on skin lightness)
+    // COLOR SCORING ENGINE (unchanged logic)
     // --------------------------------------------------------------
-    let currentSkinLightness = 52;      // 0-100
-    let currentSkinHue = 35;            // warm undertone (fixed for simplicity)
-    let currentFaceImage = null;         // for wheel center
+    let currentSkinLightness = 52;
+    let currentSkinHue = 35;
+    let currentFaceImage = null;      // for wheel center
+    let currentPreviewImage = null;   // for VIBGYOR filter
 
     function getDynamicSkinProfile(lightness, hue = 35) {
-        let idealHueCenter, hueWidth, idealContrast;
-        if (lightness > 68) {
-            idealHueCenter = (hue > 20) ? 55 : 340;
-            hueWidth = 70;
-            idealContrast = 38;
-        } else if (lightness > 48) {
-            idealHueCenter = (hue > 25) ? 30 : 200;
-            hueWidth = 85;
-            idealContrast = 32;
-        } else {
-            idealHueCenter = (hue > 30) ? 25 : 280;
-            hueWidth = 80;
-            idealContrast = 45;
-        }
-        return { skinLightness: lightness, idealHueCenter, hueWidth, idealContrast };
+        if (lightness > 68) return { skinLightness: lightness, idealHueCenter: (hue>20)?55:340, hueWidth:70, idealContrast:38 };
+        if (lightness > 48) return { skinLightness: lightness, idealHueCenter: (hue>25)?30:200, hueWidth:85, idealContrast:32 };
+        return { skinLightness: lightness, idealHueCenter: (hue>30)?25:280, hueWidth:80, idealContrast:45 };
     }
 
     function scoreColorForSkinDynamic(hue, sat, lightness, skinLightness, profile) {
@@ -422,24 +376,16 @@
         { name: "Lavender", hex: "#E6E6FA", hsl: { h: 240, s: 67, l: 94 } }
     ];
 
-    function computeAllScoresDynamic(lightness) {
+    function computeAllScores(lightness) {
         const profile = getDynamicSkinProfile(lightness, currentSkinHue);
-        return colorLibrary.map(color => {
-            let score = scoreColorForSkinDynamic(color.hsl.h, color.hsl.s, color.hsl.l, lightness, profile);
-            return { ...color, score };
+        return colorLibrary.map(c => {
+            let score = scoreColorForSkinDynamic(c.hsl.h, c.hsl.s, c.hsl.l, lightness, profile);
+            return { ...c, score };
         }).sort((a,b) => b.score - a.score);
     }
 
-    function categorizeColors(scoredColors) {
-        const best = scoredColors.filter(c => c.score >= 80);
-        const good = scoredColors.filter(c => c.score >= 65 && c.score < 80);
-        const neutral = scoredColors.filter(c => c.score >= 45 && c.score < 65);
-        const wash = scoredColors.filter(c => c.score < 45);
-        return { best, good, neutral, wash };
-    }
-
     function renderSwatchList(colors) {
-        if (!colors.length) return '<span style="opacity:0.6;">—</span>';
+        if (!colors.length) return '—';
         return colors.map(c => `<div class="swatch"><div class="swatch-color" style="background:${c.hex};"></div>${c.name}</div>`).join('');
     }
 
@@ -448,71 +394,64 @@
         const ctx = canvas.getContext("2d");
         const w = canvas.width, h = canvas.height;
         const centerX = w/2, centerY = h/2, radius = w/2 - 4;
-        ctx.clearRect(0, 0, w, h);
-        const angleStep = (Math.PI * 2) / scoredColors.length;
-        for (let i = 0; i < scoredColors.length; i++) {
-            const start = i * angleStep, end = (i+1) * angleStep;
+        ctx.clearRect(0,0,w,h);
+        const angleStep = (Math.PI*2)/scoredColors.length;
+        for(let i=0; i<scoredColors.length; i++) {
+            const start = i*angleStep, end = (i+1)*angleStep;
             const score = scoredColors[i].score;
-            let fillColor = score >= 80 ? "#2e7d64" : (score >= 65 ? "#e6b422" : (score >= 45 ? "#cb7b4a" : "#b13e3e"));
+            let fill = score>=80 ? "#2e7d64" : (score>=65 ? "#e6b422" : (score>=45 ? "#cb7b4a" : "#b13e3e"));
             ctx.beginPath();
-            ctx.moveTo(centerX, centerY);
-            ctx.arc(centerX, centerY, radius, start, end);
-            ctx.closePath();
-            ctx.fillStyle = fillColor;
+            ctx.moveTo(centerX,centerY);
+            ctx.arc(centerX,centerY,radius,start,end);
+            ctx.fillStyle = fill;
             ctx.fill();
             ctx.strokeStyle = "#f2efe8";
-            ctx.lineWidth = 1.5;
             ctx.stroke();
-            // short labels
             ctx.save();
-            ctx.translate(centerX + Math.cos(start+angleStep/2) * (radius*0.75), centerY + Math.sin(start+angleStep/2) * (radius*0.75));
+            ctx.translate(centerX+Math.cos(start+angleStep/2)*(radius*0.75), centerY+Math.sin(start+angleStep/2)*(radius*0.75));
             ctx.fillStyle = "#1e1b18";
             ctx.font = "bold 12px system-ui";
-            ctx.fillText(scoredColors[i].name.charAt(0)+scoredColors[i].name.slice(1,4), -12, 4);
+            ctx.fillText(scoredColors[i].name.slice(0,4), -12, 4);
             ctx.restore();
         }
-
-        // ---- draw center image (circular) ----
-        const centerRadius = 38;
+        // center photo
+        const centerR = 38;
         ctx.save();
         ctx.beginPath();
-        ctx.arc(centerX, centerY, centerRadius, 0, 2 * Math.PI);
-        ctx.closePath();
+        ctx.arc(centerX,centerY,centerR,0,2*Math.PI);
         ctx.clip();
-        if (currentFaceImage && currentFaceImage.complete && currentFaceImage.naturalWidth > 0) {
-            const imgW = currentFaceImage.naturalWidth;
-            const imgH = currentFaceImage.naturalHeight;
-            const scale = Math.max(centerRadius * 2 / imgW, centerRadius * 2 / imgH);
-            const drawW = imgW * scale;
-            const drawH = imgH * scale;
-            const dx = centerX - drawW/2;
-            const dy = centerY - drawH/2;
-            ctx.drawImage(currentFaceImage, dx, dy, drawW, drawH);
+        if(currentFaceImage && currentFaceImage.complete && currentFaceImage.naturalWidth>0) {
+            const scale = Math.max(centerR*2/currentFaceImage.naturalWidth, centerR*2/currentFaceImage.naturalHeight);
+            const dw = currentFaceImage.naturalWidth*scale;
+            const dh = currentFaceImage.naturalHeight*scale;
+            ctx.drawImage(currentFaceImage, centerX-dw/2, centerY-dh/2, dw, dh);
         } else {
             ctx.fillStyle = "#ece3d9";
-            ctx.fillRect(centerX - centerRadius, centerY - centerRadius, centerRadius*2, centerRadius*2);
+            ctx.fillRect(centerX-centerR, centerY-centerR, centerR*2, centerR*2);
             ctx.fillStyle = "#2c2b28";
             ctx.font = "bold 14px system-ui";
             ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
             ctx.fillText("you", centerX, centerY);
         }
         ctx.restore();
         ctx.beginPath();
-        ctx.arc(centerX, centerY, centerRadius, 0, 2 * Math.PI);
+        ctx.arc(centerX,centerY,centerR,0,2*Math.PI);
         ctx.strokeStyle = "white";
         ctx.lineWidth = 3;
         ctx.stroke();
     }
 
     function refreshUI() {
-        const scored = computeAllScoresDynamic(currentSkinLightness);
-        const cats = categorizeColors(scored);
+        const scored = computeAllScores(currentSkinLightness);
+        const best = scored.filter(c=>c.score>=80);
+        const good = scored.filter(c=>c.score>=65 && c.score<80);
+        const neutral = scored.filter(c=>c.score>=45 && c.score<65);
+        const wash = scored.filter(c=>c.score<45);
         document.getElementById("colorCategories").innerHTML = `
-            <div class="cat"><span class="cat-badge">🟢 Best Colors for You ✅</span><div class="color-swatch-list">${renderSwatchList(cats.best)}</div></div>
-            <div class="cat"><span class="cat-badge">🟡 Good Colors 👍</span><div class="color-swatch-list">${renderSwatchList(cats.good)}</div></div>
-            <div class="cat"><span class="cat-badge">⚪ Neutral Colors ➖</span><div class="color-swatch-list">${renderSwatchList(cats.neutral)}</div></div>
-            <div class="cat"><span class="cat-badge">🔴 Colors That May Wash You Out ⚠️</span><div class="color-swatch-list">${renderSwatchList(cats.wash)}</div></div>
+            <div class="cat"><span class="cat-badge">🟢 Best Colors for You ✅</span><div class="color-swatch-list">${renderSwatchList(best)}</div></div>
+            <div class="cat"><span class="cat-badge">🟡 Good Colors 👍</span><div class="color-swatch-list">${renderSwatchList(good)}</div></div>
+            <div class="cat"><span class="cat-badge">⚪ Neutral Colors ➖</span><div class="color-swatch-list">${renderSwatchList(neutral)}</div></div>
+            <div class="cat"><span class="cat-badge">🔴 Colors That May Wash You Out ⚠️</span><div class="color-swatch-list">${renderSwatchList(wash)}</div></div>
         `;
         const tbody = document.getElementById("scoreTableBody");
         tbody.innerHTML = scored.slice(0,12).map(c => `
@@ -520,12 +459,11 @@
             <td>${c.score}/100 <div class="score-bar"><div class="score-fill" style="width:${c.score}%; background:${c.score>=80?'#2e7d64':c.score>=65?'#e6b422':'#b13e3e'}"></div></div></td></tr>
         `).join('');
         drawColorWheel(scored);
-        updateOutfitScoreAndAvatar();
+        updateOutfitScore();
     }
 
-    function updateOutfitScoreAndAvatar() {
-        const slider = document.getElementById("outfitColorSlider");
-        const hue = parseInt(slider.value);
+    function updateOutfitScore() {
+        const hue = parseInt(document.getElementById("outfitColorSlider").value);
         const profile = getDynamicSkinProfile(currentSkinLightness, currentSkinHue);
         const score = scoreColorForSkinDynamic(hue, 70, 55, currentSkinLightness, profile);
         document.getElementById("outfitScoreDisplay").innerHTML = `${score}/100`;
@@ -536,223 +474,229 @@
     function drawAvatar(hue) {
         const canvas = document.getElementById("avatarCanvas");
         const ctx = canvas.getContext("2d");
-        const w = canvas.width, hh = canvas.height;
-        ctx.clearRect(0,0,w,hh);
+        const w=140, h=140;
+        ctx.clearRect(0,0,w,h);
         ctx.fillStyle = "#E0BC8C";
         ctx.beginPath();
-        ctx.arc(w/2, 55, 35, 0, 2*Math.PI);
+        ctx.arc(w/2,55,35,0,2*Math.PI);
         ctx.fill();
         ctx.fillStyle = "#553322";
         ctx.beginPath();
-        ctx.arc(w/2-12, 45, 3, 0, 2*Math.PI);
+        ctx.arc(w/2-12,45,3,0,2*Math.PI);
         ctx.fill();
         ctx.beginPath();
-        ctx.arc(w/2+12, 45, 3, 0, 2*Math.PI);
+        ctx.arc(w/2+12,45,3,0,2*Math.PI);
         ctx.fill();
         ctx.fillStyle = `hsl(${hue}, 70%, 55%)`;
-        ctx.fillRect(w/2-40, 70, 80, 65);
+        ctx.fillRect(w/2-40,70,80,65);
         ctx.fillStyle = "#aaa";
-        ctx.fillRect(w/2-15, 100, 30, 35);
+        ctx.fillRect(w/2-15,100,30,35);
         ctx.fillStyle = "#3b2c20";
-        ctx.fillRect(w/2-48, 68, 96, 12);
+        ctx.fillRect(w/2-48,68,96,12);
     }
 
-    // ------------------- Face detection & skin extraction (fixed URLs) -------------------
-    let modelsLoaded = false;
-    let currentStream = null;
-    let currentPreviewImage = null;
+    // --------------------------------------------------------------
+    // MEDIAPIPE FACE DETECTION + SKIN EXTRACTION
+    // --------------------------------------------------------------
+    let faceDetector = null;
+    let mediapipeReady = false;
 
-    async function loadFaceApiModels() {
-        const statusDiv = document.getElementById("analysisStatus");
-        statusDiv.innerText = "Loading AI models...";
+    async function initMediaPipe() {
+        const statusSpan = document.getElementById("analysisStatus");
+        statusSpan.innerText = "Loading MediaPipe...";
         try {
-            // CORRECTED URL: official face-api.js repo weights
-            const modelUrl = 'https://raw.githubusercontent.com/justadudewhohas/face-api.js/master/weights';
-            await faceapi.nets.tinyFaceDetector.loadFromUri(modelUrl);
-            await faceapi.nets.faceLandmark68Net.loadFromUri(modelUrl);
-            modelsLoaded = true;
-            statusDiv.innerText = "Ready ✅";
-        } catch (err) {
-            console.error("Model load error", err);
-            statusDiv.innerText = "⚠️ Model load failed – using manual skin slider";
-            document.getElementById("analysisStatus").style.background = "#f8d7da";
-            modelsLoaded = false;
+            const vision = await window.vision; // from bundle
+            const fileset = await vision.FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm");
+            faceDetector = await vision.FaceDetector.createFromOptions(fileset, {
+                baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float32/1/blaze_face_short_range.tflite", delegate: "CPU" },
+                runningMode: "IMAGE",
+                minDetectionConfidence: 0.5
+            });
+            mediapipeReady = true;
+            statusSpan.innerText = "Ready ✅";
+            document.getElementById("debugInfo").innerHTML += "<br>✅ MediaPipe loaded. Upload a photo or use webcam.";
+        } catch(e) {
+            console.error(e);
+            statusSpan.innerText = "⚠️ MediaPipe failed – using manual slider";
+            document.getElementById("debugInfo").innerHTML += "<br>❌ Face detection unavailable. Use the manual skin slider below.";
+            mediapipeReady = false;
         }
     }
 
-    function rgbToHsl(r, g, b) {
-        r /= 255, g /= 255, b /= 255;
-        let max = Math.max(r,g,b), min = Math.min(r,g,b);
-        let h, s, l = (max+min)/2;
-        if (max === min) h = s = 0;
-        else {
-            let d = max-min;
-            s = l > 0.5 ? d/(2-max-min) : d/(max+min);
-            switch(max) {
-                case r: h = (g-b)/d + (g<b ? 6 : 0); break;
-                case g: h = (b-r)/d + 2; break;
-                case b: h = (r-g)/d + 4; break;
-            }
-            h *= 60;
-        }
-        return { h: Math.round(h), s: Math.round(s*100), l: Math.round(l*100) };
-    }
-
-    async function extractSkinFromImage(imageElement) {
-        if (!modelsLoaded) throw new Error("Face detection models not loaded");
-        const detections = await faceapi.detectAllFaces(imageElement, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks();
-        if (!detections.length) throw new Error("No face detected");
-        const detection = detections[0];
-        const box = detection.detection.box;
+    // Extract skin tone from detected face bounding box
+    async function extractSkinFromImageWithMediaPipe(imageElement) {
+        if(!mediapipeReady || !faceDetector) throw new Error("Face detector not ready");
+        // convert HTMLImageElement to canvas for MediaPipe
         const canvas = document.createElement("canvas");
-        const ctx = canvas.getContext("2d");
         canvas.width = imageElement.width;
         canvas.height = imageElement.height;
-        ctx.drawImage(imageElement, 0, 0, canvas.width, canvas.height);
-        const foreheadX = box.x + box.width * 0.5;
-        const foreheadY = box.y + box.height * 0.2;
-        const cheekLeftX = box.x + box.width * 0.25;
-        const cheekRightX = box.x + box.width * 0.75;
-        const cheekY = box.y + box.height * 0.65;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(imageElement, 0, 0);
+        const imageData = canvas.toDataURL();
+        const mpImage = await window.vision.ImageSource(imageElement);
+        const detections = await faceDetector.detect(mpImage);
+        if(!detections.detections || detections.detections.length===0) throw new Error("No face found");
+        const box = detections.detections[0].boundingBox;
+        // sample forehead (upper 25% of face) and cheeks
+        const foreheadX = box.originX + box.width * 0.5;
+        const foreheadY = box.originY + box.height * 0.2;
+        const cheekLeftX = box.originX + box.width * 0.25;
+        const cheekRightX = box.originX + box.width * 0.75;
+        const cheekY = box.originY + box.height * 0.65;
         const samplePoints = [[foreheadX, foreheadY], [cheekLeftX, cheekY], [cheekRightX, cheekY]];
-        let rSum=0,gSum=0,bSum=0;
-        let samples=0;
-        for (let [px,py] of samplePoints) {
-            if (px>=0 && px<canvas.width && py>=0 && py<canvas.height) {
+        let rSum=0,gSum=0,bSum=0, samples=0;
+        for(let [px,py] of samplePoints) {
+            if(px>=0 && px<canvas.width && py>=0 && py<canvas.height) {
                 const pixel = ctx.getImageData(px, py, 1, 1).data;
-                rSum += pixel[0]; gSum += pixel[1]; bSum += pixel[2];
+                rSum+=pixel[0]; gSum+=pixel[1]; bSum+=pixel[2];
                 samples++;
             }
         }
-        if (samples===0) throw new Error("Could not sample skin");
-        const avg = { r: rSum/samples, g: gSum/samples, b: bSum/samples };
-        const hsl = rgbToHsl(avg.r, avg.g, avg.b);
-        return { lightness: hsl.l, hue: hsl.h };
+        if(samples===0) throw new Error("Sampling failed");
+        const avgR = rSum/samples, avgG = gSum/samples, avgB = bSum/samples;
+        // convert RGB to lightness (simple luminance)
+        const lightness = 0.2126*avgR + 0.7152*avgG + 0.0722*avgB;
+        // map to 0-100 range
+        const normLightness = Math.min(100, Math.max(0, lightness/255*100));
+        // also get hue from RGB
+        const rgbToHsl = (r,g,b) => {
+            r/=255; g/=255; b/=255;
+            let max=Math.max(r,g,b), min=Math.min(r,g,b);
+            let h,s,l=(max+min)/2;
+            if(max===min) h=s=0;
+            else {
+                let d=max-min;
+                s=l>0.5?d/(2-max-min):d/(max+min);
+                switch(max){
+                    case r: h=(g-b)/d+(g<b?6:0); break;
+                    case g: h=(b-r)/d+2; break;
+                    case b: h=(r-g)/d+4; break;
+                }
+                h*=60;
+            }
+            return {h:Math.round(h), s:Math.round(s*100), l:Math.round(l*100)};
+        };
+        const hsl = rgbToHsl(avgR, avgG, avgB);
+        return { lightness: normLightness, hue: hsl.h };
     }
 
-    async function applySkinFromImage(imageElement, imgUrl) {
+    async function analyzeAndSetSkin(imageElement) {
+        const debugDiv = document.getElementById("debugInfo");
         try {
-            document.getElementById("analysisStatus").innerText = "Analyzing skin...";
-            const { lightness, hue } = await extractSkinFromImage(imageElement);
+            debugDiv.innerHTML = "🔍 Detecting face with MediaPipe...";
+            const { lightness, hue } = await extractSkinFromImageWithMediaPipe(imageElement);
             currentSkinLightness = lightness;
             currentSkinHue = hue;
-            // sync manual slider
             document.getElementById("manualSkinSlider").value = lightness;
             document.getElementById("skinLightnessValue").innerText = Math.round(lightness);
             refreshUI();
-            document.getElementById("analysisStatus").innerText = `Detected: L=${Math.round(lightness)} (auto)`;
-            document.getElementById("analysisStatus").style.background = "#eae3d8";
+            document.getElementById("analysisStatus").innerHTML = `✅ Detected: L=${Math.round(lightness)}`;
+            debugDiv.innerHTML = `✅ Face detected! Skin lightness = ${Math.round(lightness)}. Color recommendations updated.`;
         } catch(err) {
             console.warn(err);
-            document.getElementById("analysisStatus").innerText = `Detection failed: ${err.message} – using manual slider`;
-            document.getElementById("analysisStatus").style.background = "#f8d7da";
-            // keep currentSkinLightness unchanged (manual slider will adjust)
+            debugDiv.innerHTML = `⚠️ Face detection failed: ${err.message}. Use manual slider below.`;
+            document.getElementById("analysisStatus").innerHTML = `⚠️ Detection failed – using manual slider`;
+            // keep current skin lightness as is (user can adjust slider)
         }
     }
 
-    // Manual skin slider
-    function initManualSkinSlider() {
-        const slider = document.getElementById("manualSkinSlider");
-        const valueSpan = document.getElementById("skinLightnessValue");
-        slider.addEventListener("input", (e) => {
-            const val = parseInt(e.target.value);
-            currentSkinLightness = val;
-            valueSpan.innerText = val;
-            refreshUI();
-            document.getElementById("analysisStatus").innerText = `Manual skin: L=${val}`;
-            document.getElementById("analysisStatus").style.background = "#eae3d8";
-        });
-    }
-
-    // VIBGYOR slider
-    function initVibgyorSlider() {
-        const slider = document.getElementById("vibgyorSlider");
-        slider.addEventListener("input", (e) => {
-            const hueRotate = e.target.value;
-            if (currentPreviewImage) {
-                currentPreviewImage.style.filter = `hue-rotate(${hueRotate}deg)`;
-            }
-        });
-    }
-
-    // Reset filter button
-    document.getElementById("resetFilterBtn").onclick = () => {
-        document.getElementById("vibgyorSlider").value = 0;
-        if (currentPreviewImage) {
-            currentPreviewImage.style.filter = "hue-rotate(0deg)";
-        }
-    };
-
-    // ----- UI event wiring -----
+    // --------------------------------------------------------------
+    // UI BINDINGS
+    // --------------------------------------------------------------
     document.getElementById("uploadBtn").onclick = () => document.getElementById("uploadPhoto").click();
     document.getElementById("uploadPhoto").onchange = async (e) => {
         const file = e.target.files[0];
-        if (!file) return;
-        const imgUrl = URL.createObjectURL(file);
+        if(!file) return;
+        const url = URL.createObjectURL(file);
         const img = new Image();
         img.onload = async () => {
-            URL.revokeObjectURL(imgUrl);
+            URL.revokeObjectURL(url);
             currentFaceImage = img;
-            await applySkinFromImage(img, imgUrl);
+            // show preview
             const previewDiv = document.getElementById("previewArea");
-            previewDiv.innerHTML = `<img src="${imgUrl}" class="preview-img" id="facePreviewImg">`;
+            previewDiv.innerHTML = `<img src="${url}" class="preview-img" id="facePreviewImg">`;
             currentPreviewImage = document.getElementById("facePreviewImg");
-            const currentHue = document.getElementById("vibgyorSlider").value;
-            currentPreviewImage.style.filter = `hue-rotate(${currentHue}deg)`;
-            refreshUI(); // redraw wheel with new center image
+            // apply VIBGYOR filter if any
+            const hueVal = document.getElementById("vibgyorSlider").value;
+            currentPreviewImage.style.filter = `hue-rotate(${hueVal}deg)`;
+            // analyze
+            await analyzeAndSetSkin(img);
+            refreshUI(); // ensure wheel redraws with new center image
         };
-        img.src = imgUrl;
+        img.src = url;
     };
 
-    // webcam
+    // Webcam logic
+    let currentStream = null;
     let videoElem = document.getElementById("video");
-    let webcamActive = false;
     document.getElementById("webcamBtn").onclick = async () => {
         document.getElementById("webcamPanel").style.display = "block";
-        if (!webcamActive) {
+        if(!currentStream) {
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 videoElem.srcObject = stream;
                 currentStream = stream;
-                webcamActive = true;
             } catch(err) { alert("Camera error: "+err.message); }
         }
     };
     document.getElementById("captureBtn").onclick = async () => {
-        if (!webcamActive || !videoElem.videoWidth) { alert("Start webcam first"); return; }
+        if(!currentStream || !videoElem.videoWidth) { alert("Start webcam first"); return; }
         const canvas = document.createElement("canvas");
         canvas.width = videoElem.videoWidth;
         canvas.height = videoElem.videoHeight;
-        canvas.getContext("2d").drawImage(videoElem, 0, 0, canvas.width, canvas.height);
+        canvas.getContext("2d").drawImage(videoElem, 0, 0);
         const img = new Image();
         img.onload = async () => {
             currentFaceImage = img;
-            await applySkinFromImage(img, img.src);
             const previewDiv = document.getElementById("previewArea");
             previewDiv.innerHTML = `<img src="${img.src}" class="preview-img" id="facePreviewImg">`;
             currentPreviewImage = document.getElementById("facePreviewImg");
-            const currentHue = document.getElementById("vibgyorSlider").value;
-            currentPreviewImage.style.filter = `hue-rotate(${currentHue}deg)`;
+            const hueVal = document.getElementById("vibgyorSlider").value;
+            currentPreviewImage.style.filter = `hue-rotate(${hueVal}deg)`;
+            await analyzeAndSetSkin(img);
             refreshUI();
         };
         img.src = canvas.toDataURL();
     };
     document.getElementById("stopWebcamBtn").onclick = () => {
-        if (currentStream) currentStream.getTracks().forEach(t => t.stop());
+        if(currentStream) currentStream.getTracks().forEach(t=>t.stop());
         videoElem.srcObject = null;
-        webcamActive = false;
+        currentStream = null;
         document.getElementById("webcamPanel").style.display = "none";
     };
 
-    // outfit slider event
-    document.getElementById("outfitColorSlider").addEventListener("input", updateOutfitScoreAndAvatar);
+    // Retry detection on current face image
+    document.getElementById("retryDetectionBtn").onclick = async () => {
+        if(currentFaceImage) {
+            await analyzeAndSetSkin(currentFaceImage);
+        } else {
+            document.getElementById("debugInfo").innerHTML = "No image loaded. Please upload or capture first.";
+        }
+    };
 
-    // Initialize
-    loadFaceApiModels().then(() => {
-        initManualSkinSlider();
-        initVibgyorSlider();
+    // Manual skin slider
+    const manualSlider = document.getElementById("manualSkinSlider");
+    manualSlider.addEventListener("input", (e) => {
+        const val = parseInt(e.target.value);
+        currentSkinLightness = val;
+        document.getElementById("skinLightnessValue").innerText = val;
         refreshUI();
-    }).catch(err => console.warn("Initialization error", err));
+        document.getElementById("analysisStatus").innerHTML = `Manual mode: L=${val}`;
+    });
+
+    // VIBGYOR filter
+    document.getElementById("vibgyorSlider").addEventListener("input", (e) => {
+        const deg = e.target.value;
+        if(currentPreviewImage) currentPreviewImage.style.filter = `hue-rotate(${deg}deg)`;
+    });
+
+    // Outfit slider
+    document.getElementById("outfitColorSlider").addEventListener("input", updateOutfitScore);
+
+    // Initialization
+    initMediaPipe().then(() => {
+        refreshUI();
+    });
 </script>
 </body>
 </html>
